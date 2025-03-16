@@ -48,11 +48,17 @@ jobs:
         run: msbuild ServiceUpdater.sln /p:Configuration=Release /p:Platform=x86 /m /t:Rebuild /p:VcpkgRoot=C:\vcpkg
         shell: cmd
 
+      - name: 🔍 Debug Build Output
+        run: |
+          echo "Checking Release directory contents:"
+          Get-ChildItem -Path "Release\" -Recurse
+        shell: pwsh
+
       - name: 📁 Organize Build Artifacts
         run: |
           mkdir Builds
           mkdir Builds\ServiceUpdater_v${{ env.APP_VERSION }}
-          Copy-Item -Path "**/Release/*.exe", "**/Release/*.dll", "**/Release/*.pdb" -Destination "Builds/ServiceUpdater_v${{ env.APP_VERSION }}" -Force
+          Copy-Item -Path "Release\ServiceUpdater.exe", "Release\ServiceUpdater.pdb", "Release\ServiceUpdater.dll" -Destination "Builds/ServiceUpdater_v${{ env.APP_VERSION }}" -Force
         shell: pwsh
 
       - name: 📦 Upload Build Artifacts
