@@ -22,19 +22,20 @@ jobs:
       - name: 🛠 Install vcpkg dependencies
         run: |
           if not exist C:\vcpkg (
-            echo "Cloning vcpkg..."
+            echo Cloning vcpkg...
             git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
           )
           if not exist C:\vcpkg\bootstrap-vcpkg.bat (
-            echo "Bootstrapping vcpkg..."
+            echo Bootstrapping vcpkg...
             C:\vcpkg\bootstrap-vcpkg.bat
           )
-          echo "Updating vcpkg..."
+          echo Updating vcpkg...
           C:\vcpkg\vcpkg integrate install
-          C:\vcpkg\vcpkg update || echo "vcpkg already up to date."
-          C:\vcpkg\vcpkg upgrade --no-dry-run || echo "No upgrades needed."
-          echo "Installing dependencies..."
+          C:\vcpkg\vcpkg update || echo vcpkg already up to date.
+          C:\vcpkg\vcpkg upgrade --no-dry-run || echo No upgrades needed.
+          echo Installing dependencies...
           C:\vcpkg\vcpkg install fmt openssl curl[openssl] spdlog zlib libsodium boost-program-options --triplet x86-windows-static
+        shell: cmd
 
       - name: 🔍 Extract Version from .rc File
         id: get_version
