@@ -22,29 +22,35 @@ jobs:
       - name: 🛠 Install vcpkg dependencies
         run: |
           if not exist C:\vcpkg (
-          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-          C:\vcpkg\bootstrap-vcpkg.bat
+            echo "Cloning vcpkg..."
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
           )
+          if not exist C:\vcpkg\bootstrap-vcpkg.bat (
+            echo "Bootstrapping vcpkg..."
+            C:\vcpkg\bootstrap-vcpkg.bat
+          )
+          echo "Updating vcpkg..."
           C:\vcpkg\vcpkg integrate install
-          C:\vcpkg\vcpkg update
-          C:\vcpkg\vcpkg upgrade --no-dry-run
+          C:\vcpkg\vcpkg update || echo "vcpkg already up to date."
+          C:\vcpkg\vcpkg upgrade --no-dry-run || echo "No upgrades needed."
+          echo "Installing dependencies..."
           C:\vcpkg\vcpkg install fmt openssl curl[openssl] spdlog zlib libsodium boost-program-options --triplet x86-windows-static
 
       - name: 🔍 Extract Version from .rc File
         id: get_version
         run: |
-          $version = (Select-String -Path "ServiceUpdater/ServiceUpdater.rc" -Pattern "FILEVERSION").Line -replace '[^0-9,]', ''
-          $version = $version -replace ',', '.'
+          $version = (Select-String -Path "ServiceUpdater/ServiceUpdater.rc" -Pattern "FILEVERSION\s+(\d+),\s*(\d+),\s*(\d+),\s*(\d+)").Matches.Groups[1..4] -join "."
           echo "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
         shell: pwsh
 
       - name: 🏗 Build Solution
         run: msbuild ServiceUpdater.sln /p:Configuration=Release /p:Platform=x86 /m /t:Rebuild /p:VcpkgRoot=C:\vcpkg
+        shell: cmd
 
       - name: 📁 Organize Build Artifacts
         run: |
           mkdir Builds
-          mkdir Builds/ServiceUpdater_v${{ env.APP_VERSION }}
+          mkdir Builds\ServiceUpdater_v${{ env.APP_VERSION }}
           Copy-Item -Path "**/Release/*.exe", "**/Release/*.dll", "**/Release/*.pdb" -Destination "Builds/ServiceUpdater_v${{ env.APP_VERSION }}" -Force
         shell: pwsh
 
