@@ -29,7 +29,7 @@ jobs:
       - name: 🔍 Extract Version from .rc File
         id: get_version
         run: |
-          $version = (Select-String -Path "ServiceUpdater/resource.rc" -Pattern "FILEVERSION").Line -replace '[^0-9,]', ''
+          $version = (Select-String -Path "ServiceUpdater/ServiceUpdater.rc" -Pattern "FILEVERSION").Line -replace '[^0-9,]', ''
           $version = $version -replace ',', '.'
           echo "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
         shell: pwsh
