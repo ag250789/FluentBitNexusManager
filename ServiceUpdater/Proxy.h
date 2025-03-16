@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
-#include <curl_openssl/curl.h>
+#include <curl/curl.h>
 #include <spdlog/spdlog.h>
 #include "Logger.h"
 #include "DecryptionManager.h"
