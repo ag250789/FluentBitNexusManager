@@ -34,7 +34,7 @@ jobs:
           C:\vcpkg\vcpkg update || echo vcpkg already up to date.
           C:\vcpkg\vcpkg upgrade --no-dry-run || echo No upgrades needed.
           echo Installing dependencies...
-          C:\vcpkg\vcpkg install fmt openssl curl[openssl] spdlog zlib libsodium boost-program-options --triplet x86-windows-static
+          C:\vcpkg\vcpkg install fmt openssl curl[openssl] spdlog zlib libsodium nlohmann-json boost-program-options --triplet x86-windows-static
         shell: cmd
 
       - name: 🔍 Extract Version from .rc File
