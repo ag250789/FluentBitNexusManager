@@ -103,7 +103,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>advapi32.lib;crypt32.lib;user32.lib;Ws2_32.lib;fmt.lib;libssl.lib;libcrypto.lib;libcurl_openssl.lib;spdlog.lib;zlib.lib;ZipLib.lib;lzmaZipLib.lib;bzip2.lib;cpr.lib;libcron.lib;libsodium.lib;boost_program_options-vc143-mt-x32-1_86.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;crypt32.lib;user32.lib;Ws2_32.lib;fmt.lib;libssl.lib;libcrypto.lib;libcurl.lib;spdlog.lib;zlib.lib;ZipLib.lib;lzmaZipLib.lib;bzip2.lib;libcron.lib;libsodium.lib;boost_program_options-vc143-mt-x32-1_86.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
