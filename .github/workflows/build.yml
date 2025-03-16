@@ -1,0 +1,51 @@
+name: Build Windows Application
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up MSBuild
+        uses: microsoft/setup-msbuild@v1.3
+
+      - name: 🛠 Install vcpkg dependencies
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          C:\vcpkg\vcpkg integrate install
+          C:\vcpkg\vcpkg install fmt openssl curl[openssl] spdlog zlib libsodium boost-program-options --triplet x86-windows-static
+
+      - name: 🔍 Extract Version from .rc File
+        id: get_version
+        run: |
+          $version = (Select-String -Path "ServiceUpdater/resource.rc" -Pattern "FILEVERSION").Line -replace '[^0-9,]', ''
+          $version = $version -replace ',', '.'
+          echo "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+        shell: pwsh
+
+      - name: 🏗 Build Solution
+        run: msbuild ServiceUpdater.sln /p:Configuration=Release /p:Platform=x86 /m /t:Rebuild /p:VcpkgRoot=C:\vcpkg
+
+      - name: 📁 Organize Build Artifacts
+        run: |
+          mkdir Builds
+          mkdir Builds/ServiceUpdater_v${{ env.APP_VERSION }}
+          Copy-Item -Path "**/Release/*.exe", "**/Release/*.dll", "**/Release/*.pdb" -Destination "Builds/ServiceUpdater_v${{ env.APP_VERSION }}" -Force
+        shell: pwsh
+
+      - name: 📦 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ServiceUpdater_v${{ env.APP_VERSION }}
+          path: Builds/ServiceUpdater_v${{ env.APP_VERSION }}
