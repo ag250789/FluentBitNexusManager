@@ -58,7 +58,7 @@ jobs:
         run: |
           mkdir Builds
           mkdir Builds\ServiceUpdater_v${{ env.APP_VERSION }}
-          Copy-Item -Path "Release\ServiceUpdater.exe", "Release\ServiceUpdater.pdb", "Release\ServiceUpdater.dll" -Destination "Builds/ServiceUpdater_v${{ env.APP_VERSION }}" -Force
+          Copy-Item -Path "Release\ServiceUpdater.exe" -Destination "Builds/ServiceUpdater_v${{ env.APP_VERSION }}" -Force
         shell: pwsh
 
       - name: 📦 Upload Build Artifacts
