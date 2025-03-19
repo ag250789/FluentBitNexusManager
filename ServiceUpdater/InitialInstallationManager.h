@@ -29,21 +29,28 @@ public:
         m_siteId(ConvertStringToWString(siteId)) {
     }
 
+    /**
+     * @brief Determines whether the initial installation process should be performed.
+     *
+     * This function checks for the existence of `install_config.json` and evaluates its contents
+     * to decide whether an initial installation is required. If the configuration file does not
+     * exist, it checks if services are already installed. It also logs details about the installation
+     * reason, required version, timestamp, and services to be installed.
+     *
+     * @return true if the initial installation should proceed, false otherwise.
+     */
     bool ShouldPerformInitialInstall() {
         std::string configPath = m_extractPath + "\\ncrv_dcs_streaming_service_upgrade_manager\\install_config.json";
 
-        // Ako `install_config.json` ne postoji, radimo inicijalnu instalaciju samo ako servisi nisu instalirani
         if (!fs::exists(configPath)) {
-            //spdlog::warn("`install_config.json` not found. Proceeding with initial install check.");
             LOG_WARN("`install_config.json` not found. Proceeding with initial install check.");
 
-            return !AreServicesInstalled();  // Ako servisi nisu instalirani, instaliramo ih.
+            return !AreServicesInstalled();  
         }
 
         try {
             std::ifstream configFile(configPath);
             if (!configFile.is_open()) {
-                //spdlog::error("Failed to open `install_config.json`.");
                 LOG_ERROR("Failed to open `install_config.json`.");
 
                 return false;
@@ -53,35 +60,27 @@ public:
             configFile >> config;
             configFile.close();
 
-            // ? Logovanje dodatnih podataka
             if (config.contains("install_reason") && config["install_reason"].is_string()) {
-                //spdlog::info("Initial Install reason: {}", config["install_reason"].get<std::string>());
                 LOG_INFO("Initial Install reason: {}", config["install_reason"].get<std::string>());
 
             }
 
             if (config.contains("required_version") && config["required_version"].is_string()) {
-                //spdlog::info("Required version: {}", config["required_version"].get<std::string>());
                 LOG_INFO("Required version: {}", config["required_version"].get<std::string>());
 
             }
 
             if (config.contains("timestamp") && config["timestamp"].is_string()) {
-                //spdlog::info("Install timestamp: {}", config["timestamp"].get<std::string>());
                 LOG_INFO("Install timestamp: {}", config["timestamp"].get<std::string>());
 
             }
 
-            // ? Logovanje liste servisa koji ?e biti instalirani
             if (config.contains("services") && config["services"].is_array()) {
-                //spdlog::info("Services to install:");
                 LOG_INFO("Services to install:");
 
                 for (const auto& service : config["services"]) {
                     if (service.contains("name") && service.contains("exe")) {
-                        /*spdlog::info("   --> Service: {}, Executable: {}",
-                            service["name"].get<std::string>(),
-                            service["exe"].get<std::string>());*/
+                        
                         LOG_INFO("   --> Service: {}, Executable: {}",
                             service["name"].get<std::string>(),
                             service["exe"].get<std::string>());
@@ -89,7 +88,6 @@ public:
                 }
             }
             else {
-                //spdlog::warn("No services defined in `install_config.json`.");
                 LOG_WARN("No services defined in `install_config.json`.");
 
             }
@@ -99,56 +97,51 @@ public:
                 : false;
 
             if (!enableInstall && !AreServicesInstalled()) {
-                //spdlog::warn("`install_config.json` disables installation, but services are missing. Proceeding with install.");
                 LOG_WARN("`install_config.json` disables installation, but services are missing. Proceeding with install.");
 
                 return true;
             }
 
 
-            //spdlog::info("`install_config.json` found. Initial install enabled: {}", enableInstall ? "YES" : "NO");
             LOG_INFO("`install_config.json` found. Initial install enabled: {}", enableInstall ? "YES" : "NO");
 
             return enableInstall;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Error reading `install_config.json`: {}", e.what());
             LOG_ERROR("Error reading `install_config.json`: {}", e.what());
 
             return false;
         }
     }
+    
     /**
-     * @brief Pokre?e proces inicijalne instalacije servisa.
-     * @return true ako je instalacija uspešna, false ako nije potrebna ili ako do?e do greške.
+     * @brief Initiates the initial service installation process.
+     *
+     * This function performs the initial installation by extracting necessary files, verifying
+     * installation conditions, and installing required services. If no services require installation,
+     * the function logs the event and exits. It also cleans up extracted files after installation
+     * is completed.
+     *
+     * @return true if the installation was successful, false otherwise.
      */
     bool PerformInitialInstallation() {
         try {
 
-            //spdlog::info("Starting initial service installation process...");
             LOG_INFO("Starting initial service installation process...");
 
-
-            
-
-            // 1?? Preuzmi i raspakuj ZIP
             if (!m_updateManager.PerformInitialInstallation()) {
-                //spdlog::info("No initial installation needed.");
                 LOG_INFO("No initial installation needed.");
 
                 return false;
             }
 
-            // Proveravamo da li treba da radimo inicijalnu instalaciju
             if (!ShouldPerformInitialInstall()) {
-                //spdlog::warn("Initial installation skipped based on `install_config.json`.");
                 LOG_WARN("Initial installation skipped based on `install_config.json`.");
                 m_updateManager.CleanExtractedFolder();
 
                 return false;
             }
 
-            // 2?? Instaliraj servise ako nisu ve? instalirani
             bool installationPerformed = false;
             for (const auto& [serviceName, exePath, newExeName] : m_services) {
                 if (InstallServiceIfNeeded(newExeName, serviceName)) {
@@ -157,13 +150,11 @@ public:
             }
 
             if (installationPerformed) {
-                //spdlog::info("Initial service installation completed successfully.");
                 LOG_INFO("Initial service installation completed successfully.");
 
                 m_updateManager.CleanExtractedFolder();
             }
             else {
-                //spdlog::info("[InitialInstallManager] No services required installation.");
                 LOG_INFO("No services required installation.");
 
             }
@@ -171,7 +162,6 @@ public:
             return installationPerformed;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception in PerformInitialInstallation: {}", e.what());
             LOG_ERROR("Exception in PerformInitialInstallation: {}", e.what());
 
             return false;
@@ -198,42 +188,49 @@ private:
     std::wstring m_siteId;
 
     /**
-     * @brief Proverava da li su servisi ve? instalirani.
-     * @return `true` ako su svi servisi instalirani, `false` ako bar jedan nedostaje.
+     * @brief Checks if all required services are installed.
+     *
+     * This function iterates through the list of services and verifies if each one is installed
+     * using the Windows Service Manager. If any service is missing, it logs a warning and returns `false`.
+     *
+     * @return true if all services are installed, false otherwise.
      */
     bool AreServicesInstalled() {
         WindowsServiceManager serviceManager;
 
         for (const auto& [serviceName, exePath, newExeName] : m_services) {
             if (!serviceManager.isServiceInstalled(serviceName)) {
-                //spdlog::warn("Service '{}' is not installed.", ConvertWStringToString(serviceName));
                 LOG_WARN("Service '{}' is not installed.", ConvertWStringToString(serviceName));
 
                 return false;
             }
         }
 
-        //spdlog::info("All services are already installed.");
         LOG_INFO("All services are already installed.");
 
         return true;
     }
 
     /**
-     * @brief Instalira servis ako ve? nije instaliran.
-     * @return true ako je servis instaliran, false ako je ve? postojao.
+     * @brief Installs a service if it is not already installed.
+     *
+     * This function checks if the service's executable exists in the extraction directory. If the
+     * file is present, it attempts to install or update the service. If the service is already installed,
+     * it returns `false`.
+     *
+     * @param newExeName The name of the new executable file for the service.
+     * @param serviceName The name of the service to install.
+     * @return true if the service was installed successfully, false if it was already present.
      */
     bool InstallServiceIfNeeded(const std::wstring& newExeName, const std::wstring& serviceName) {
         std::wstring newExePath = fs::path(m_extractPath) / L"ncrv_dcs_streaming_service_upgrade_manager" / newExeName;
 
         if (!fs::exists(newExePath)) {
-            //spdlog::warn("New executable does not exist: {}", ConvertWStringToString(newExePath));
             LOG_WARN("New executable does not exist: {}", ConvertWStringToString(newExePath));
 
             return false;
         }
 
-        //spdlog::info("Installing service '{}'", ConvertWStringToString(serviceName));
         LOG_INFO("Installing service '{}'", ConvertWStringToString(serviceName));
 
 
@@ -245,8 +242,12 @@ private:
 
 
     /**
-     * @brief Generiše argumente za instalaciju servisa (osim za Watchdog koji ih nema).
-     * @return Lista argumenata.
+     * @brief Generates command-line arguments for service installation.
+     *
+     * This function constructs a list of arguments for the service installation command,
+     * including company ID, region, and site ID. The Watchdog service does not require arguments.
+     *
+     * @return A list of arguments as `std::vector<std::wstring>`.
      */
     std::vector<std::wstring> GenerateServiceArguments() {
         std::vector<std::wstring> args;

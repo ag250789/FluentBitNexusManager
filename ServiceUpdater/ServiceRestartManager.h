@@ -20,37 +20,40 @@ public:
         m_targetPath(targetPath) {
     }
 
+    /**
+     * @brief Updates a service by replacing its executable and restarting it.
+     *
+     * This function checks if the service is installed, stops it if it is running,
+     * creates a backup of the existing executable, copies the new executable to the target path,
+     * and attempts to restart the service. If the update fails, a rollback mechanism restores
+     * the previous executable and attempts to restart the service.
+     *
+     * @return true if the update and restart were successful, false otherwise.
+     */
     bool UpdateAndRestartService() {
         WindowsServiceManager serviceManager;
 
-        //spdlog::info("[ServiceRestartManager] Attempting to update and restart service '{}'", ConvertWStringToString(m_serviceName));
         LOG_INFO("Attempting to update and restart service '{}'", ConvertWStringToString(m_serviceName));
 
         if (!serviceManager.isServiceInstalled(m_serviceName)) {
-            //spdlog::error("[ServiceRestartManager] Service '{}' is not installed.", ConvertWStringToString(m_serviceName));
             LOG_ERROR("Service '{}' is not installed.", ConvertWStringToString(m_serviceName));
 
             return false;
         }
 
-        //spdlog::info("[ServiceRestartManager] Service '{}' is installed.", ConvertWStringToString(m_serviceName));
         LOG_INFO("Service '{}' is installed.", ConvertWStringToString(m_serviceName));
 
         if (!fs::exists(m_newFilePath)) {
-            //spdlog::error("[ServiceRestartManager] New file does not exist: {}", ConvertWStringToString(m_newFilePath));
             LOG_ERROR("New file does not exist: {}", ConvertWStringToString(m_newFilePath));
 
             return false;
         }
 
-        //spdlog::info("[ServiceRestartManager] New file found at '{}'", ConvertWStringToString(m_newFilePath));
         LOG_INFO("New file found at '{}'", ConvertWStringToString(m_newFilePath));
 
         bool wasServiceRunning = serviceManager.isServiceRunning(m_serviceName);
 
-        // Ako je servis bio pokrenut, prvo ga zaustavljamo pre update-a
         if (wasServiceRunning) {
-            //spdlog::info("[ServiceRestartManager] Stopping service: {}", ConvertWStringToString(m_serviceName));
             LOG_INFO("Stopping service: {}", ConvertWStringToString(m_serviceName));
 
             serviceManager.stopService(m_serviceName);
@@ -58,25 +61,21 @@ public:
             int retries = 10;
             while (serviceManager.isServiceRunning(m_serviceName) && retries-- > 0) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
-                //spdlog::warn("[ServiceRestartManager] Waiting for service '{}' to stop... ({} retries left)", ConvertWStringToString(m_serviceName), retries);
                 LOG_WARN("Waiting for service '{}' to stop... ({} retries left)", ConvertWStringToString(m_serviceName), retries);
 
             }
 
             if (serviceManager.isServiceRunning(m_serviceName)) {
-                //spdlog::error("[ServiceRestartManager] Failed to stop service '{}'!", ConvertWStringToString(m_serviceName));
                 LOG_ERROR("Failed to stop service '{}'!", ConvertWStringToString(m_serviceName));
 
                 return false;
             }
         }
 
-        //spdlog::info("[ServiceRestartManager] Service '{}' successfully stopped.", ConvertWStringToString(m_serviceName));
         LOG_INFO("Service '{}' successfully stopped.", ConvertWStringToString(m_serviceName));
         UpgradePathManager path;
         std::wstring m_backupPath = ConvertStringToWString(path.GetBackupPath()) + std::filesystem::path(m_targetPath).filename().wstring();
 
-        // Backup starog fajla
         if (fs::exists(m_targetPath)) {
             try {
 
@@ -84,7 +83,6 @@ public:
                 LOG_INFO("  Target path: '{}'", ConvertWStringToString(m_targetPath));
                 LOG_INFO("  Backup path: '{}'", ConvertWStringToString(m_backupPath));
 
-                // Ako su target i backup isti, dodaj još jedan .bak
                 if (m_backupPath == m_targetPath) {
                     LOG_WARN("Backup path is the same as the target path! Appending additional '.bak' suffix.");
                     m_backupPath = m_targetPath + L".bak";
@@ -92,27 +90,22 @@ public:
                     LOG_INFO("New backup path: '{}'", ConvertWStringToString(m_backupPath));
                 }
 
-                //spdlog::info("[ServiceRestartManager] Creating backup at '{}'", ConvertWStringToString(m_backupPath));
                 LOG_INFO("Creating backup at '{}'", ConvertWStringToString(m_backupPath));
 
                 fs::copy(m_targetPath, m_backupPath, fs::copy_options::overwrite_existing);
 
-                //spdlog::info("[ServiceRestartManager] Backup created at '{}'", ConvertWStringToString(m_backupPath));
                 LOG_INFO("Backup created at '{}'", ConvertWStringToString(m_backupPath));
             }
             catch (const std::exception& e) {
-                //spdlog::error("[ServiceRestartManager] Failed to create backup: {}", e.what());
                 LOG_ERROR("Failed to create backup: {}", e.what());
                 return false;
             }
         }
         else {
-            //spdlog::warn("[ServiceRestartManager] Target file '{}' does not exist, skipping backup.", ConvertWStringToString(m_targetPath));
             LOG_WARN("Target file '{}' does not exist, skipping backup.", ConvertWStringToString(m_targetPath));
         }
 
 
-        // Kopiranje novog fajla na ciljno mesto
         try {
             LOG_INFO("Copying '{}' ? '{}'", ConvertWStringToString(m_newFilePath), ConvertWStringToString(m_targetPath));
             fs::copy(m_newFilePath, m_targetPath, fs::copy_options::overwrite_existing);
@@ -129,9 +122,7 @@ public:
             return false;
         }
 
-        //spdlog::info("[ServiceRestartManager] File updated successfully at '{}'", ConvertWStringToString(m_targetPath));
-        //spdlog::info("[ServiceRestartManager] Starting service '{}'", ConvertWStringToString(m_serviceName));
-
+        
         LOG_INFO("File updated successfully at '{}'", ConvertWStringToString(m_targetPath));
         LOG_INFO("Starting service '{}'", ConvertWStringToString(m_serviceName));
 
@@ -163,9 +154,18 @@ public:
     }
 
 private:
-    std::wstring m_serviceName;
-    std::wstring m_newFilePath;
-    std::wstring m_targetPath;
+    std::wstring m_serviceName;  ///< The name of the service to update.
+    std::wstring m_newFilePath;  ///< The path to the new service executable.
+    std::wstring m_targetPath;   ///< The target path where the service executable is located.
+
+    /**
+     * @brief Rolls back the service update if an error occurs.
+     *
+     * If the update fails, this function restores the previous executable from a backup
+     * and attempts to restart the service if it was running before the update.
+     *
+     * @param wasServiceRunning Indicates whether the service was running before the update.
+     */
 
     void rollback(bool wasServiceRunning) {
         WindowsServiceManager serviceManager;

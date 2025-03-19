@@ -173,7 +173,23 @@ public:
     std::string getCronTab() const { return cronTab; }
 
 
-
+    /**
+     * @brief Loads configuration parameters from a JSON file.
+     *
+     * This function reads a JSON configuration file and extracts required parameters such as
+     * CompanyID, Region, and SiteID. It also extracts optional parameters like LogConfig, ProxyConfig,
+     * and CronTab if they exist. If the configuration file is missing, empty, or invalid, the function
+     * logs the error and returns false.
+     *
+     * @param configFilePath Path to the JSON configuration file.
+     * @param companyId Output parameter to store the extracted CompanyID.
+     * @param region Output parameter to store the extracted Region.
+     * @param siteId Output parameter to store the extracted SiteID.
+     * @param logPath Output parameter to store the extracted LogConfig (optional).
+     * @param proxyConfig Output parameter to store the extracted ProxyConfig (optional).
+     * @param cronTab Output parameter to store the extracted CronTab (optional).
+     * @return true if the configuration was successfully loaded, false otherwise.
+     */
     static bool LoadConfigFromFile(const std::string& configFilePath, std::string& companyId, std::string& region, std::string& siteId, std::string& logPath, std::string& proxyConfig, std::string& cronTab) {
         if (!fs::exists(configFilePath) || fs::is_empty(configFilePath)) {
             spdlog::error("Configuration file does not exist or is empty: {}", configFilePath);
@@ -213,7 +229,6 @@ public:
                 throw std::runtime_error("Invalid or missing 'SiteID' in configuration file.");
             }
 
-            // U?itaj opcione vrednosti ako postoje, u suprotnom ostavi podrazumevanu praznu vrednost
             logPath = config.value("LogConfig", "");
             proxyConfig = config.value("ProxyConfig", "");
             cronTab = config.value("CronTab", "");
@@ -232,32 +247,38 @@ public:
 
         return true;
     }
-
+    /**
+     * @brief Copies a file from the source path to the destination path with robustness.
+     *
+     * This function copies a file while ensuring that the destination directory exists.
+     * If the directory does not exist, it creates the necessary directories.
+     * The function also logs the progress and handles errors gracefully.
+     *
+     * @param source Path to the source file.
+     * @param destination Path to the destination file.
+     * @return true if the file was copied successfully, false otherwise.
+     */
     static bool copy_file_robust(const std::string& source, const std::string& destination) {
         try {
-            // Logovanje po?etka operacije
             spdlog::info("Starting file copy: {} -> {}", source, destination);
 
 
-            // Provera da li fajl postoji
             if (!fs::exists(source)) {
                 spdlog::error("Source file does not exist: {}", source);
 
                 return false;
             }
 
-            // Dobijanje putanje direktorijuma odredišnog fajla
             fs::path destPath = destination;
             fs::path destDir = destPath.parent_path();
 
-            // Ako direktorijum ne postoji, kreiraj ga
             if (!fs::exists(destDir)) {
                 spdlog::info("Creating directory: {}", destDir.string());
 
                 fs::create_directories(destDir);
             }
 
-            // Kopiranje fajla
+            
             fs::copy_file(source, destination, fs::copy_options::overwrite_existing);
             spdlog::info("File copied successfully from {} to {}", source, destination);
 

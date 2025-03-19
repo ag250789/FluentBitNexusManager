@@ -2,11 +2,19 @@
 #include "UpgradePathManager.h"
 
 std::shared_ptr<spdlog::logger> Logger::s_Logger;
-std::shared_ptr<spdlog::details::thread_pool> Logger::s_ThreadPool;  // Globalni thread pool za async logger
+std::shared_ptr<spdlog::details::thread_pool> Logger::s_ThreadPool;  
 
+/**
+ * @brief Initializes the logger with settings from a configuration file.
+ *
+ * This function loads logger configuration from a JSON file, including log directory,
+ * file name, maximum file size, log rotation settings, and async logging options.
+ * It sets up both console and file log sinks, with automatic log rotation and
+ * periodic log flushing.
+ */
 void Logger::Init() {
     if (s_Logger) {
-        return;  // Logger je ve? inicijalizovan, ne dupliramo ga
+        return;  
     }
 
     try {
@@ -29,7 +37,6 @@ void Logger::Init() {
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_pattern("[%Y-%m-%d %H:%M:%S] [%^%l%$] [%s:%#] %v");
 
-        // ? Poboljšana rotacija logova
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath, maxFileSize, maxFiles, true);
         file_sink->set_pattern("[%Y-%m-%d %H:%M:%S] [%l] [%s:%#] %v");
 
@@ -48,7 +55,7 @@ void Logger::Init() {
 
         s_Logger->set_level(logLevel);
         s_Logger->flush_on(spdlog::level::err);
-        spdlog::flush_every(std::chrono::seconds(5));  // ? Automatsko flushovanje svakih 5 sekundi
+        spdlog::flush_every(std::chrono::seconds(5)); 
 
         CleanupOldLogs(logDirectory, deleteLogsOlderThanDays, maxFiles);
 
@@ -58,19 +65,38 @@ void Logger::Init() {
     }
 }
 
+/**
+ * @brief Shuts down the logger and ensures all log messages are flushed.
+ *
+ * This function flushes all pending log messages and then shuts down the logger.
+ * A short delay is introduced to ensure all logs are properly written before shutdown.
+ */
 void Logger::Shutdown() {
     if (s_Logger) {
         s_Logger->flush();
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));  // Pauza da osigura flush pre gašenja
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));  
         spdlog::shutdown();
         s_Logger.reset();
     }
 }
 
+/**
+ * @brief Retrieves the global logger instance.
+ *
+ * @return A shared pointer to the global logger instance.
+ */
 std::shared_ptr<spdlog::logger>& Logger::GetLogger() {
     return s_Logger;
 }
 
+/**
+ * @brief Loads the logger configuration from a JSON file.
+ *
+ * This function reads logging settings from a JSON configuration file.
+ * If the file is missing or invalid, it returns a default configuration.
+ *
+ * @return A JSON object containing the logger configuration.
+ */
 json Logger::LoadConfig() {
     UpgradePathManager pathManager;
     std::string logFileName = pathManager.GetLogPath();
@@ -102,6 +128,15 @@ json Logger::LoadConfig() {
     }
 }
 
+/**
+ * @brief Converts a string representation of a log level into an `spdlog` log level.
+ *
+ * This function maps string values such as "trace", "debug", "info", etc.,
+ * to their corresponding `spdlog` level enumeration values.
+ *
+ * @param level The log level as a string.
+ * @return The corresponding `spdlog::level::level_enum` value.
+ */
 spdlog::level::level_enum Logger::GetLogLevel(const std::string& level) {
     if (level == "trace") return spdlog::level::trace;
     if (level == "debug") return spdlog::level::debug;
@@ -113,9 +148,19 @@ spdlog::level::level_enum Logger::GetLogLevel(const std::string& level) {
 }
 
 
+/**
+ * @brief Cleans up old log files based on age and maximum file limits.
+ *
+ * This function deletes log files older than a specified number of days and removes
+ * the oldest logs if the total number of log files exceeds the configured limit.
+ *
+ * @param directory The directory containing the log files.
+ * @param days The number of days after which logs should be deleted.
+ * @param maxFiles The maximum number of log files to retain.
+ */
 
 void Logger::CleanupOldLogs(const std::string& directory, int days, int maxFiles) {
-    if (days <= 0 && maxFiles <= 0) return; // Nema potrebe za ?iš?enjem
+    if (days <= 0 && maxFiles <= 0) return; 
 
     try {
         auto now = std::chrono::system_clock::now();
@@ -128,7 +173,6 @@ void Logger::CleanupOldLogs(const std::string& directory, int days, int maxFiles
             }
         }
 
-        // 1. Brisanje po starosti (delete_logs_older_than_days)
         for (const auto& [path, ftime] : logFiles) {
             auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
                 ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now()
@@ -145,7 +189,6 @@ void Logger::CleanupOldLogs(const std::string& directory, int days, int maxFiles
             }
         }
 
-        // Ponovo u?itaj sve logove nakon brisanja starih fajlova
         logFiles.clear();
         for (const auto& entry : fs::directory_iterator(directory)) {
             if (entry.is_regular_file() && entry.path().extension() == ".log") {
@@ -154,10 +197,9 @@ void Logger::CleanupOldLogs(const std::string& directory, int days, int maxFiles
             }
         }
 
-        // 2. Brisanje po max_files - Ako imamo više fajlova nego dozvoljeno, brišemo najstarije
         if (maxFiles > 0 && logFiles.size() > maxFiles) {
             std::sort(logFiles.begin(), logFiles.end(),
-                [](const auto& a, const auto& b) { return a.second < b.second; }); // Sortiraj po starosti
+                [](const auto& a, const auto& b) { return a.second < b.second; });
 
             size_t numToDelete = logFiles.size() - maxFiles;
             for (size_t i = 0; i < numToDelete; ++i) {

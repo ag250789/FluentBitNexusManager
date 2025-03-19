@@ -33,7 +33,6 @@ public:
     static void EnsureUpgradeDirectoriesExist() {
         UpgradePathManager pathManager;
 
-        // ? Kreiramo sve potrebne direktorijume ako ne postoje
         std::vector<std::string> directories = {
             pathManager.GetUpgradeDirectory(),
             pathManager.GetZipDirectory(),
@@ -61,29 +60,24 @@ public:
 
     static bool copy_file_robust(const std::string& source, const std::string& destination) {
         try {
-            // Logovanje po?etka operacije
             spdlog::info("Starting file copy: {} -> {}", source, destination);
 
 
-            // Provera da li fajl postoji
             if (!fs::exists(source)) {
                 spdlog::error("Source file does not exist: {}", source);
 
                 return false;
             }
 
-            // Dobijanje putanje direktorijuma odredišnog fajla
             fs::path destPath = destination;
             fs::path destDir = destPath.parent_path();
 
-            // Ako direktorijum ne postoji, kreiraj ga
             if (!fs::exists(destDir)) {
                 spdlog::info("Creating directory: {}", destDir.string());
 
                 fs::create_directories(destDir);
             }
 
-            // Kopiranje fajla
             fs::copy_file(source, destination, fs::copy_options::overwrite_existing);
             spdlog::info("File copied successfully from {} to {}", source, destination);
 
@@ -125,12 +119,10 @@ public:
         return m_logFile;
     }
 
-    // ? Putanja do upgrade foldera
     std::string GetUpgradeDirectory() const {
         return m_upgradePath;
     }
 
-    // ? Putanja do ZIP fajlova
     std::string GetZipDirectory() const {
         return m_zipPath;
     }
@@ -139,12 +131,10 @@ public:
         return m_configPath;
     }
 
-    // ? Putanja gde su fajlovi ekstrahovani
     std::string GetExtractedPath() const {
         return m_extractedPath;
     }
 
-    // ? Putanja do ZIP fajla sa nadogradnjom
     std::string GetZipFilePath() const {
         return m_zipFilePath;
     }
@@ -157,7 +147,6 @@ public:
         return m_proxyConfig;
     }
 
-    // ? Putanja do JSON fajla sa hash vrednostima ZIP fajlova
     std::string GetZipHashFilePath() const {
         return m_zipHashFilePath;
     }
@@ -166,12 +155,10 @@ public:
         return GetUpgradeRootPath();
     }
 
-    // ? Putanja do JSON fajla sa hash vrednostima servisa
     std::string GetServiceHashFilePath() const {
         return m_serviceHashFilePath;
     }
 
-    // ? Ime ZIP fajla koji se koristi za update
     std::string GetBlobName() const {
         return m_blobName;
     }
@@ -180,12 +167,10 @@ public:
         return m_uninstallDir;
     }
 
-    // ? Putanja do prvog servisa (FluentBitManager)
     std::wstring GetService1TargetPath() const {
         return ConvertStringToWString(GetServiceInstallPath() + "FluentBitManager.exe");
     }
 
-    // ? Putanja do drugog servisa (WatchdogFluentBit)
     std::wstring GetService2TargetPath() const {
         return ConvertStringToWString(GetServiceInstallPath() + "watchdog\\WatchdogFluentBit.exe");
     }
@@ -198,12 +183,10 @@ public:
         return (GetServiceInstallPath() + "service_configuration\\DCSAgentDataStreamConfig.json");
     }
 
-    // ? Ime prvog servisa
     std::wstring GetService1Name() const {
         return L"DCSStreamingAgentController";
     }
 
-    // ? Ime drugog servisa
     std::wstring GetService2Name() const {
         return L"DCSStreamingAgentWatchdog";
     }
@@ -227,7 +210,6 @@ public:
                 return false;
             }
 
-            // Višestruko prepisivanje (3 puta) sa nasumi?nim podacima
             for (int pass = 0; pass < 3; ++pass) {
                 file.seekp(0);
                 for (std::size_t i = 0; i < fileSize; ++i) {
@@ -237,7 +219,6 @@ public:
             }
             file.close();
 
-            // Uklanjanje fajla nakon prepisivanja
             std::filesystem::remove(filePath);
             spdlog::info("Securely deleted file: {}", filePath);
             return true;
@@ -274,23 +255,34 @@ private:
 
 
     /**
-     * @brief Proverava da li je sistem 64-bitni ili 32-bitni.
-     * @return true ako je 64-bitni, false ako je 32-bitni.
+     * @brief Checks whether the system is 64-bit or 32-bit.
+     *
+     * This function determines the system architecture by checking whether the process
+     * is running in a 64-bit environment. If compiled as a 64-bit application, it always
+     * returns true. If compiled as a 32-bit application, it uses `IsWow64Process` to check
+     * if it is running on a 64-bit OS.
+     *
+     * @return true if the system is 64-bit, false if it is 32-bit.
      */
     bool Is64BitSystem() const {
 #if defined(_WIN64)
-        return true;  // 64-bitni proces na 64-bitnom sistemu
+        return true;  // 64-bit process running on a 64-bit system
 #elif defined(_WIN32)
         BOOL isWow64 = FALSE;
-        return IsWow64Process(GetCurrentProcess(), &isWow64) && isWow64; // 32-bitni proces na 64-bitnom sistemu
+        return IsWow64Process(GetCurrentProcess(), &isWow64) && isWow64; // 32-bit process on a 64-bit system
 #else
-        return false; // Stariji procesori
+        return false; // Older architectures (non-Windows)
 #endif
     }
 
+
     /**
-     * @brief Vra?a osnovni direktorijum gde se nalazi `Upgrade` folder.
-     * Automatski bira `Program Files` ili `Program Files (x86)`.
+     * @brief Returns the root directory where the `Upgrade` folder is located.
+     *
+     * This function automatically selects between `Program Files` and `Program Files (x86)`
+     * based on whether the system is 64-bit or 32-bit.
+     *
+     * @return The root directory path as a string.
      */
     std::string GetUpgradeRootPath() const {
         return Is64BitSystem()
@@ -299,8 +291,12 @@ private:
     }
 
     /**
-     * @brief Vra?a osnovni direktorijum gde su instalirani servisi.
-     * Automatski bira `Program Files` ili `Program Files (x86)`.
+     * @brief Returns the installation path for services.
+     *
+     * This function determines whether to use `Program Files` or `Program Files (x86)`
+     * depending on the system architecture.
+     *
+     * @return The directory path where services are installed.
      */
     std::string GetServiceInstallPath() const {
         return Is64BitSystem()
@@ -309,14 +305,21 @@ private:
     }
 
     /**
-     * @brief Konvertuje `std::string` u `std::wstring`.
+     * @brief Converts a `std::string` to `std::wstring`.
+     *
+     * This function converts a UTF-8 encoded string to a wide string (`std::wstring`)
+     * using the Windows API function `MultiByteToWideChar`. If the input string is empty
+     * or conversion fails, an empty wide string is returned.
+     *
+     * @param str The UTF-8 encoded string to be converted.
+     * @return The converted wide string (`std::wstring`).
      */
     std::wstring ConvertStringToWString(const std::string& str) const {
         if (str.empty()) return L"";
 
         int size_needed = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
         if (size_needed <= 0) {
-            return L""; // Greška u konverziji
+            return L""; 
         }
 
         std::wstring wstr(size_needed, 0);
@@ -326,7 +329,16 @@ private:
     }
 
     
-
+    /**
+     * @brief Converts a `std::wstring` to `std::string`.
+     *
+     * This function converts a wide string (`std::wstring`) to a UTF-8 encoded `std::string`
+     * using the Windows API function `WideCharToMultiByte`. If the input string is empty,
+     * an empty string is returned.
+     *
+     * @param wstr The wide string to be converted.
+     * @return The converted UTF-8 string (`std::string`).
+     */
     std::string ConvertWStringToString(const std::wstring& wstr) {
         if (wstr.empty()) return "";
         int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);

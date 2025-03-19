@@ -32,45 +32,39 @@ public:
     }
 
     /**
- * @brief Proverava da li je fajl prisutan, upisuje hash u JSON i signalizira da je instalacija spremna.
- * @return true ako je instalacija validna, false ako nije.
- */
+     * @brief Performs the initial installation process by computing and storing the configuration file's hash.
+     *
+     * This function checks whether the configuration file exists, calculates its SHA-256 hash, and
+     * stores it in a JSON file. If any step fails, it logs the error and returns `false`. If the
+     * installation process is successful, it returns `true`.
+     *
+     * @return true if the initial installation process is successful, false otherwise.
+     */
     [[nodiscard]] bool InitialInstall() {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
         try {
-            //spdlog::info("Starting initial installation process for '{}'", m_configFilePath);
             LOG_INFO("Starting initial installation process for '{}'", m_configFilePath);
 
-            // ? Proveri da li fajl postoji
             if (!fs::exists(m_configFilePath)) {
-                //spdlog::error("Configuration file does not exist: {}", m_configFilePath);
                 LOG_ERROR("Configuration file does not exist: {}", m_configFilePath);
                 return false;
             }
 
-            // ? Izra?unaj hash fajla
             auto currentHash = m_fileHasher.GetFileSHA256(m_configFilePath);
             if (!currentHash) {
-                //spdlog::error("Failed to compute SHA-256 hash for file: {}", m_configFilePath);
                 LOG_ERROR("Failed to compute SHA-256 hash for file: {}", m_configFilePath);
                 return false;
             }
 
-            //spdlog::info("Computed hash: {}", *currentHash);
             LOG_INFO("Computed hash: {}", *currentHash);
 
-
-            // ? Upisujemo hash u JSON (uvek, bez obzira da li postoji ili ne)
-            //spdlog::info("Storing initial hash in JSON...");
             LOG_INFO("Storing initial hash in JSON...");
             m_fileHasher.StoreFileHash(m_configFilePath, *currentHash);
-            //spdlog::info("Initial hash stored successfully.");
             LOG_INFO("Initial hash stored successfully.");
 
-            return true; // ?? Instalacija je validna!
+            return true; 
         }
         catch (const std::exception& e) {
-            //spdlog::error("Error during initial installation process: {}", e.what());
             LOG_ERROR("Error during initial installation process: {}", e.what());
             return false;
         }
@@ -84,40 +78,32 @@ public:
     [[nodiscard]] bool ShouldRestartService() {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
         try {
-            //spdlog::info("Checking if service restart is required...");
             LOG_INFO("Checking if service restart is required...");
 
 
             if (!fs::exists(m_configFilePath)) {
-                //spdlog::warn("Configuration file does not exist: {}", m_configFilePath);
                 LOG_WARN("Configuration file does not exist: {}", m_configFilePath);
                 return false;
             }
 
             auto currentHash = m_fileHasher.GetFileSHA256(m_configFilePath);
             if (!currentHash) {
-                //spdlog::error("Failed to compute SHA-256 hash for file: {}", m_configFilePath);
                 LOG_ERROR("Failed to compute SHA-256 hash for file: {}", m_configFilePath);
                 return false;
             }
-            //spdlog::info("Computed current hash: {}", *currentHash);
             LOG_INFO("Computed current hash: {}", *currentHash);
 
             auto storedHash = m_fileHasher.GetStoredFileHash(m_configFilePath);
             if (storedHash) {
-                //spdlog::info("Stored hash from JSON: {}", *storedHash);
                 LOG_INFO("Stored hash from JSON: {}", *storedHash);
             }
             else {
-                //spdlog::warn("No stored hash found in JSON.");
                 LOG_WARN("No stored hash found in JSON.");
             }
 
-            //spdlog::info("m_firstTimeHashStored: {}", m_firstTimeHashStored ? "true" : "false");
             LOG_INFO("m_firstTimeHashStored: {}", m_firstTimeHashStored ? "true" : "false");
 
             if ((!storedHash || storedHash->empty()) && m_firstTimeHashStored) {
-                //spdlog::info("First-time hash detected. Restart required.");
                 LOG_INFO("First-time hash detected. Restart required.");
                 m_fileHasher.StoreFileHash(m_configFilePath, *currentHash);
                 m_restartRequired = true;
@@ -126,19 +112,16 @@ public:
             }
 
             if (storedHash && (*storedHash != *currentHash)) {
-                //spdlog::info("Configuration file has changed: {}", m_configFilePath);
                 LOG_INFO("Configuration file has changed: {}", m_configFilePath);
                 m_fileHasher.StoreFileHash(m_configFilePath, *currentHash);
                 m_restartRequired = true;
                 return true;
             }
 
-            //spdlog::info("Configuration file is unchanged. No restart required.");
             LOG_INFO("Configuration file is unchanged. No restart required.");
             return false;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Error checking configuration file change: {}", e.what());
             LOG_ERROR("Error checking configuration file change: {}", e.what());
             return false;
         }
@@ -151,7 +134,6 @@ public:
     void AcknowledgeRestart() {
         std::unique_lock<std::shared_mutex> lock(m_mutex);
         m_restartRequired = false;
-        //spdlog::info("Restart acknowledged. Service restart is no longer required.");
         LOG_INFO("Restart acknowledged. Service restart is no longer required.");
     }
 
@@ -165,7 +147,6 @@ public:
             return m_fileHasher.GetStoredFileHash(m_configFilePath);
         }
         catch (const std::exception& e) {
-            //spdlog::warn("Failed to retrieve stored configuration hash: {}", e.what());
             LOG_WARN("Failed to retrieve stored configuration hash: {}", e.what());
             return std::nullopt;
         }
@@ -192,23 +173,19 @@ private:
      */
     void Initialize() {
         if (!fs::exists(m_configFilePath)) {
-            //spdlog::warn("Configuration file does not exist initially: {}", m_configFilePath);
             LOG_WARN("Configuration file does not exist initially: {}", m_configFilePath);
             return;
         }
 
-        //spdlog::info("Monitoring configuration file: {}", m_configFilePath);
         LOG_INFO("Monitoring configuration file: {}", m_configFilePath);
 
         auto storedHash = m_fileHasher.GetStoredFileHash(m_configFilePath);
         if (!storedHash) {
             auto initialHash = m_fileHasher.GetFileSHA256(m_configFilePath);
             if (initialHash) {
-                //spdlog::info("No stored hash found, initializing with current hash.");
                 LOG_INFO("No stored hash found, initializing with current hash.");
                 m_fileHasher.StoreFileHash(m_configFilePath, *initialHash);
                 m_firstTimeHashStored = true; 
-                //spdlog::info("First-time initialization complete. Restart will be required.");
                 LOG_INFO("First-time initialization complete. Restart will be required.");
             }
         }

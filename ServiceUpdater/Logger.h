@@ -18,12 +18,12 @@ namespace fs = std::filesystem;
 class Logger {
 public:
     static void Init();
-    static void Shutdown();  // Dodata funkcija za reset
+    static void Shutdown();  
     static std::shared_ptr<spdlog::logger>& GetLogger();
 
 private:
     static std::shared_ptr<spdlog::logger> s_Logger;
-    static std::shared_ptr<spdlog::details::thread_pool> s_ThreadPool;  // Thread pool za async logger
+    static std::shared_ptr<spdlog::details::thread_pool> s_ThreadPool;  // Thread pool for async logger
     static json LoadConfig();
     static spdlog::level::level_enum GetLogLevel(const std::string& level);
     static void CleanupOldLogs(const std::string& directory, int days, int maxFiles);

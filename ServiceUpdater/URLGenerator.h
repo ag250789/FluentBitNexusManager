@@ -4,6 +4,7 @@
 #include "DecryptionManager.h"
 #include <string>
 #include <unordered_map>
+#include <cpr/cpr.h>
 #include <iostream>
 
 class URLGenerator {
@@ -72,7 +73,6 @@ public:
         }
         catch (const std::exception& e) {
             // Log or handle the error as needed, returning an empty string on failure
-            //spdlog::error("Exception during SAS token generation: {}", e.what());
             LOG_ERROR("Exception during SAS token generation: {}", e.what());
 
             return "";  // Return empty string to indicate failure
@@ -117,7 +117,6 @@ public:
         }
         catch (const std::exception& e) {
             // Log the exception using spdlog and return an empty string on failure
-            //spdlog::error("Exception during base URL generation: {}", e.what());
             LOG_ERROR("Exception during base URL generation: {}", e.what());
 
             return "";  // Return empty string to indicate failure
@@ -154,7 +153,6 @@ public:
         // Check if the region is valid
         auto it = regionUrls.find(region);
         if (it == regionUrls.end()) {
-            //spdlog::error("Invalid region: {}", region);
             LOG_ERROR("Invalid region: {}", region);
             return "";  // Return an empty string in case of an invalid region
         }
@@ -164,10 +162,23 @@ public:
         return baseUrl + "/" + customerId + "/" + blobName + "?" + generateSasToken();
     }
 
+    /**
+     * @brief Checks if a given URL exists by sending an HTTP HEAD request.
+     *
+     * This function uses `libcurl` to make a HEAD request to the specified URL
+     * without downloading the response body. If the request succeeds and returns
+     * an HTTP status code of 200, the URL is considered to exist.
+     *
+     * - Follows redirects if necessary.
+     * - Disables SSL certificate and hostname verification (for debugging purposes).
+     * - Uses a timeout of 10 seconds for the request.
+     *
+     * @param url The URL to check.
+     * @return true if the URL exists (HTTP 200 response), false otherwise.
+     */
     bool urlExists(const std::string& url) const {
         CURL* curl = curl_easy_init();
         if (!curl) {
-            //std::cerr << "Failed to initialize CURL" << std::endl;
             LOG_ERROR("Failed to initialize CURL.");
 
             return false;
@@ -176,12 +187,13 @@ public:
         bool exists = false;
         CURLcode res;
 
+        // Configure CURL options for a HEAD request
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);  // HEAD request - ne preuzimamo telo
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  // Prati redirekcije
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);  // Proverava validnost sertifikata
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);  // Proverava validnost imena hosta
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);  // Postavlja timeout na 10 sekundi
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);  // Use HEAD request (no response body)
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  // Follow redirects
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);  // Skip SSL certificate validation
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);  // Skip hostname verification
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);  // Set timeout to 10 seconds
 
         res = curl_easy_perform(curl);
 
@@ -253,7 +265,6 @@ public:
         }
 
         // If neither URL is valid, log the failure and return an empty string
-        //spdlog::warn("Neither URL with siteId nor URL without siteId exists.");
         LOG_WARN("Neither URL with siteId nor URL without siteId exists.");
 
         return "";

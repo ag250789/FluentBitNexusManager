@@ -284,14 +284,22 @@ public:
         }
     }
 
-
+    /**
+     * @brief Starts the cron scheduler for executing scheduled tasks.
+     *
+     * This function initializes and runs a cron scheduler using the `cronTab` expression
+     * provided in the configuration. It schedules a service upgrade task and continuously
+     * checks for scheduled jobs in a loop. The scheduler remains active while `running` is true.
+     *
+     * If an exception occurs during the execution of a scheduled task, it logs the error.
+     * If a fatal error occurs, it logs and exits the scheduler.
+     */
     void StartCronScheduler() {
         try {
             spdlog::info("[Cron] Starting scheduler with expression: {}", cronTab);
 
             Cron cron;
 
-            // ? Koristimo cronTab koji dolazi iz konfiguracije
             cron.add_schedule("Service Upgrade Task", cronTab, [this](auto&) {
                 try {
                     spdlog::info("[Cron] Executing scheduled service upgrade...");
@@ -304,7 +312,6 @@ public:
 
             spdlog::info("[Cron] Scheduler started. Running cron jobs...");
 
-            // ? Beskona?na petlja za pokretanje tick() svake sekunde
             while (running) {
                 cron.tick();
                 std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -324,13 +331,13 @@ public:
         try {
             spdlog::info("[NexusManager] Starting...");
 
-            // ? 1. Load Configuration FIRST (needed for installation)
+            // 1. Load Configuration FIRST (needed for installation)
             if (!LoadConfiguration()) {
                 spdlog::error("[NexusManager] Failed to load configuration.");
                 return;
             }
 
-            // ? 2. Perform Initial Installation (if required)
+            // 2. Perform Initial Installation (if required)
             if (PerformInitialInstallation()) {
                 spdlog::info("[NexusManager] Initial installation completed.");
             }
@@ -338,13 +345,13 @@ public:
                 spdlog::info("[NexusManager] Initial installation was not required.");
             }
 
-            // ? 3. Start Cron Scheduler in a separate thread
+            // 3. Start Cron Scheduler in a separate thread
             running = true;
             schedulerThread = std::thread(&MainService::StartCronScheduler, this);
 
             spdlog::info("[NexusManager] Successfully started.");
 
-            // ? Dodaj join() kako bi spre?io gašenje aplikacije
+            // Dodaj join() kako bi se sprecilo gašenje aplikacije
             /*if (schedulerThread.joinable()) {
                 schedulerThread.join();
             }*/
@@ -361,10 +368,10 @@ public:
         try {
             spdlog::info("[NexusManager] Stopping...");
 
-            running = false;  // ? Set the flag to stop the cron loop
+            running = false;  // Set the flag to stop the cron loop
 
             if (schedulerThread.joinable()) {
-                schedulerThread.join();  // ? Wait for cron thread to exit
+                schedulerThread.join();  // Wait for cron thread to exit
             }
 
             spdlog::info("[NexusManager] Stopped successfully.");

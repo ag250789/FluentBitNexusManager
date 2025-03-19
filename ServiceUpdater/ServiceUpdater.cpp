@@ -82,31 +82,32 @@ void ServiceMain(DWORD argc, LPTSTR* argv) {
 
     try {
         
-        // 2?? Inicijalizujemo glavnu servis klasu
+        
+        // Step 1: Initialize the main service class
         MainService nexusManager;
 
-        // 3?? U?itavanje konfiguracije iz fajla (NE koristimo argumente)
+        // Step 2: Load configuration from a file (command-line arguments are NOT used)
         if (!nexusManager.LoadConfiguration()) {
             spdlog::error("[ServiceMain] Failed to load configuration.");
             ServiceStatus.dwCurrentState = SERVICE_STOPPED;
             SetServiceStatus(hStatus, &ServiceStatus);
             return;
         }
-        
-        // 4?? Postavljamo servis u RUNNING stanje
+
+        // Step 3: Set the service to RUNNING state
         ServiceStatus.dwCurrentState = SERVICE_RUNNING;
         SetServiceStatus(hStatus, &ServiceStatus);
         spdlog::info("[ServiceMain] Service is now running.");
 
-        // 5?? Pokretanje glavne servis logike
+        // Step 4: Start the main service logic
         nexusManager.StartNexusManager();
 
-        // 6?? Glavna petlja - ?ekamo signal za gašenje
+        // Step 5: Main loop - Wait for the stop signal
         while (!stopService) {
-            Sleep(1000);
+            Sleep(1000); // Prevents CPU overuse by sleeping for 1 second per iteration
         }
 
-        // 7?? Kada je signalizirano gašenje, zaustavljamo servis
+        // Step 6: When a stop signal is received, stop the service
         spdlog::info("[ServiceMain] Stopping NexusManager...");
         nexusManager.StopNexusManager();
     }
@@ -249,34 +250,6 @@ void InstallService(CommandLineParser& parser) {
 }
 
 
-std::string ConvertWStringToString1(const std::wstring& wstr) {
-    if (wstr.empty()) return "";
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    if (size_needed <= 0) return "";
-
-    std::string result(size_needed, 0); // NE oduzimamo 1 sada
-    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &result[0], size_needed, nullptr, nullptr);
-
-    // Uklanjamo eventualne null karaktere koji mogu biti uba?eni
-    result.erase(std::find(result.begin(), result.end(), '\0'), result.end());
-
-    return result;
-}
-
-std::string ConvertWStringToString2(const std::wstring& wstr) {
-    if (wstr.empty()) return "";
-
-    // Odredimo koliko bajtova treba za konverziju
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    if (size_needed <= 0) return "";
-
-    // Koristimo vektor da osiguramo sigurnu konverziju
-    std::vector<char> buffer(size_needed);
-    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, buffer.data(), size_needed, nullptr, nullptr);
-
-    // Pretvaramo u std::string bez nul-karaktera
-    return std::string(buffer.data());
-}
 
 void UninstallMainService() {
     // Define the service names
@@ -315,13 +288,6 @@ void FullUninstallService() {
     MainService::RemoveDirectoryContents(path.GetRootDir());  // Remove the contents of the "CSM2.0" directory
 }
 
-#include <string>
-#include <regex>
-
-std::string NormalizePath1(const std::string& path) {
-    std::regex doubleBackslash(R"(\\+)");  // Regularni izraz za duple i više backslash karaktere
-    return std::regex_replace(path, doubleBackslash, R"(\)"); // Zamenjuje ih jednim backslashom
-}
 
 void PrintBanner() {
     std::cout << R"(
@@ -382,15 +348,11 @@ int main(int argc, char* argv[]) {
                     spdlog::error("Failed to save configuration at: {}", configFilePath);
                 }
 
-                // 2?? Inicijalizujemo glavnu servis klasu
                 MainService nexusManager;
 
-                // 3?? U?itavanje konfiguracije iz fajla (NE koristimo argumente)
                 if (!nexusManager.LoadConfiguration()) {
                     return 1;
                 }
-
-                // 5?? Pokretanje glavne servis logike
                 nexusManager.StartNexusManager();*/
             }
             // Check if the first argument is "uninstall"

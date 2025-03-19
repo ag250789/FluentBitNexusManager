@@ -18,8 +18,8 @@ public:
         const std::wstring& serviceName1, const std::wstring& serviceName2,
         const std::wstring& exePath1, const std::wstring& exePath2)
         : m_updateManager(region, customerId, siteId, blobName, zipHashFile, downloadPath + "\\" + blobName, extractPath),
-        m_zipFileHasher(zipHashFile),     // Pracenje hash vrednosti ZIP fajla
-        m_serviceFileHasher(serviceHashFile), // Pracenje hash vrednosti executable servisa
+        m_zipFileHasher(zipHashFile),     
+        m_serviceFileHasher(serviceHashFile), 
         m_zipHashFile(zipHashFile),
         m_serviceHashFile(serviceHashFile),
         m_services{ {serviceName1, exePath1, L"FluentBitManager.exe"},
@@ -29,31 +29,32 @@ public:
         m_region(ConvertStringToWString(region)),
         m_customerId(ConvertStringToWString(customerId)),
         m_siteId(ConvertStringToWString(siteId)),
-        m_fullReinstall(false)  // Podrazumevano radimo restart, osim ako JSON kaže drugacije
+        m_fullReinstall(false)  
     {
     }
 
     /**
-     * @brief Pokre?e proces nadogradnje servisa.
-     * @return true ako je nadogradnja uspešna, false ako nije potrebna ili ako je došlo do greške.
+     * @brief Performs the service upgrade process.
+     *
+     * This function initiates the upgrade by checking for updates via `UpdateManager`.
+     * If a ZIP file update is detected, it verifies whether a full reinstall is required.
+     * It then compares the current service executables with the new ones and updates them if needed.
+     * After a successful upgrade, it cleans up extracted files.
+     *
+     * @return true if the upgrade was successful, false otherwise.
      */
     bool PerformUpgrade() {
         try {
-            //spdlog::info("[ServiceUpgradeManager] Starting service upgrade process...");
             LOG_INFO("Starting service upgrade process...");
 
-            // 1. Pokreni UpdateManager za preuzimanje i proveru ZIP fajla
             if (!m_updateManager.PerformUpdate()) {
-                //spdlog::info("[ServiceUpgradeManager] No ZIP update necessary.");
                 LOG_INFO("No ZIP update necessary.");
 
                 return false;
             }
 
-            // **Koristimo funkciju iz `UpdateManager` da proverimo da li radimo full reinstall!**
             m_fullReinstall = m_updateManager.NeedsFullReinstall();
 
-            // 2. Uporedi i ažuriraj svaki servis
             bool updatePerformed = false;
             for (const auto& [serviceName, exePath, newExeName] : m_services) {
                 if (CompareAndUpdateService(exePath, newExeName, serviceName)) {
@@ -62,13 +63,11 @@ public:
             }
 
             if (updatePerformed) {
-                //spdlog::info("[ServiceUpgradeManager] Service upgrade completed successfully.");
                 LOG_INFO("Service upgrade completed successfully.");
 
                 m_updateManager.CleanExtractedFolder();
             }
             else {
-                //spdlog::info("[ServiceUpgradeManager] No services required updating.");
                 LOG_INFO("No services required updating.");
 
             }
@@ -76,7 +75,6 @@ public:
             return updatePerformed;
         }
         catch (const std::exception& e) {
-            //spdlog::error("[ServiceUpgradeManager] Exception in PerformUpgrade: {}", e.what());
             LOG_ERROR("Exception in PerformUpgrade: {}", e.what());
 
             return false;
@@ -85,45 +83,47 @@ public:
 
 private:
     struct ServiceInfo {
-        std::wstring serviceName;
-        std::wstring exePath;
-        std::wstring newExeName;
+        std::wstring serviceName;  ///< The name of the service.
+        std::wstring exePath;      ///< The current executable path of the service.
+        std::wstring newExeName;   ///< The new executable name after the update.
     };
 
-    UpdateManager m_updateManager;
-    FileHasher m_zipFileHasher;       // ? Pra?enje hash vrednosti ZIP fajla
-    FileHasher m_serviceFileHasher;   // ? Pra?enje hash vrednosti executable servisa
-    std::string m_zipHashFile;        // ? JSON za ZIP fajlove
-    std::string m_serviceHashFile;    // ? JSON za servise (exe)
-    std::vector<ServiceInfo> m_services;
-    std::string m_downloadPath;
-    std::string m_extractPath;
-    std::wstring m_region;
-    std::wstring m_customerId;
-    std::wstring m_siteId;
-    bool m_fullReinstall; // ? Promenljiva koja odre?uje da li je potreban full reinstall
+    UpdateManager m_updateManager;     ///< Manages downloading and extracting updates.
+    FileHasher m_zipFileHasher;        ///< Tracks the hash values of ZIP update files.
+    FileHasher m_serviceFileHasher;    ///< Tracks the hash values of service executables.
+    std::string m_zipHashFile;         ///< Path to the JSON file storing ZIP hash values.
+    std::string m_serviceHashFile;     ///< Path to the JSON file storing service hash values.
+    std::vector<ServiceInfo> m_services;  ///< List of services being managed.
+    std::string m_downloadPath;        ///< Path where update files are downloaded.
+    std::string m_extractPath;         ///< Path where update files are extracted.
+    std::wstring m_region;             ///< The region associated with the service.
+    std::wstring m_customerId;         ///< The customer ID for service management.
+    std::wstring m_siteId;             ///< The site ID for service management.
+    bool m_fullReinstall;              ///< Indicates whether a full reinstall is needed.
 
 
     /**
-     * @brief Generiše listu argumenata za instalaciju servisa.
-     * @return Vektor argumenata (ili prazan ako ih nema).
+     * @brief Generates a list of arguments for service installation.
+     *
+     * This function constructs a list of command-line arguments that will be passed to
+     * the service during installation. The arguments include company ID, region, and site ID
+     * if they are available.
+     *
+     * @return A vector containing installation arguments. If no arguments are needed, the vector is empty.
      */
     std::vector<std::wstring> GenerateServiceArguments() {
         std::vector<std::wstring> args;
 
-        // ? Ako imamo `m_customerId`, dodaj `--companyid`
         if (!m_customerId.empty()) {
             args.push_back(L"--companyid");
             args.push_back(m_customerId);
         }
 
-        // ? Ako postoji `m_region`, dodaj `--region`
         if (!m_region.empty()) {
             args.push_back(L"--region");
             args.push_back(m_region);
         }
 
-        // ? Ako postoji `m_siteId`, dodaj `--siteid`
         if (!m_siteId.empty()) {
             args.push_back(L"--siteid");
             args.push_back(m_siteId);
@@ -131,9 +131,21 @@ private:
 
         return args;
     }
+    
     /**
-     * @brief Proverava da li se exe fajl promenio i ako jeste, restartuje servis.
-     * @return true ako je servis ažuriran, false ako nije.
+     * @brief Compares an existing service executable with a new one and updates if necessary.
+     *
+     * This function checks if the new executable file exists and compares its hash with the
+     * currently installed version. If the files differ, it updates the service and restarts it.
+     *
+     * - If the target executable is missing and a full reinstall is required, the service is reinstalled.
+     * - If the executable has changed, the service is updated and restarted.
+     * - If no update is needed, the function logs the status and exits.
+     *
+     * @param targetExePath The path of the currently installed service executable.
+     * @param newExeName The name of the new executable file.
+     * @param serviceName The name of the service to be updated.
+     * @return true if the service was updated, false if no update was needed or if an error occurred.
      */
     bool CompareAndUpdateService(const std::wstring& targetExePath, const std::wstring& newExeName,
         const std::wstring& serviceName) {
@@ -142,66 +154,51 @@ private:
 
 
         if (!fs::exists(newExePath)) {
-            //spdlog::warn("[ServiceUpgradeManager] New executable does not exist: {}", ConvertWStringToString(newExePath));
             LOG_WARN("New executable does not exist: {}", ConvertWStringToString(newExePath));
 
             return false;
         }
 
         if (!fs::exists(targetExePath)) {
-            //spdlog::warn("[ServiceUpgradeManager] Target executable '{}' does not exist!", ConvertWStringToString(targetExePath));
             LOG_WARN("Target executable '{}' does not exist!", ConvertWStringToString(targetExePath));
 
             if (m_fullReinstall) {
-                //spdlog::info("[ServiceUpgradeManager] Full reinstall required for '{}' as the target exe is missing.", ConvertWStringToString(serviceName));
                 LOG_INFO("Full reinstall required for '{}' as the target exe is missing.", ConvertWStringToString(serviceName));
 
-                // **Ako je Watchdog, ne šaljemo argumente**
                 std::vector<std::wstring> args = (serviceName == L"DCSStreamingAgentWatchdog") ? std::vector<std::wstring>{} : GenerateServiceArguments();
 
                 ServiceManager serviceManager(serviceName, newExePath, args);
                 return serviceManager.UpdateService();
             }
             else {
-                //spdlog::error("[ServiceUpgradeManager] ? Target executable '{}' is missing, but full reinstall is not enabled! Aborting update.", ConvertWStringToString(serviceName));
                 LOG_ERROR("Target executable '{}' is missing, but full reinstall is not enabled! Aborting update.", ConvertWStringToString(serviceName));
 
                 return true;
             }
         }
 
-        // Koristi odvojeni JSON za hashove servisa
         if (!m_serviceFileHasher.CheckAndUpdateFileHash(ConvertWStringToString(targetExePath),
             ConvertWStringToString(newExePath),
             m_serviceHashFile)) {
-            //spdlog::info("[ServiceUpgradeManager] No update required for '{}'.", ConvertWStringToString(targetExePath));
             LOG_INFO("No update required for '{}'.", ConvertWStringToString(targetExePath));
 
             return false;
         }
 
-        /*spdlog::info("[ServiceUpgradeManager] Executable '{}' has changed. Updating and restarting service '{}'.",
-            ConvertWStringToString(targetExePath), ConvertWStringToString(serviceName));*/
-
+        
         LOG_INFO("Executable '{}' has changed. Updating and restarting service '{}'.",
             ConvertWStringToString(targetExePath), ConvertWStringToString(serviceName));
-        // Ako je potreban full reinstall
         if (m_fullReinstall) {
-            //spdlog::info("Full reinstall required for '{}'", ConvertWStringToString(serviceName));
             LOG_INFO("Full reinstall required for '{}'", ConvertWStringToString(serviceName));
 
-            //std::vector<std::wstring> args = GenerateServiceArguments();
             std::vector<std::wstring> args = (serviceName == L"DCSStreamingAgentWatchdog") ? std::vector<std::wstring>{} : GenerateServiceArguments();
 
-            // Koristimo ServiceManager za reinstalaciju
             ServiceManager serviceManager(serviceName, newExePath, args);
             return serviceManager.UpdateService();
         }
         else {
-            //spdlog::info("Restarting service '{}'", ConvertWStringToString(serviceName));
             LOG_INFO("Restarting service '{}'", ConvertWStringToString(serviceName));
 
-            // ? Koristimo ServiceRestartManager za restart
             ServiceRestartManager serviceManager(serviceName, newExePath, targetExePath);
             return serviceManager.UpdateAndRestartService();
         }

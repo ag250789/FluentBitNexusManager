@@ -160,7 +160,6 @@ void WindowsServiceManager::removeService(const std::wstring& serviceName) {
 
         // If the service is not already stopped, attempt to stop it.
         if (status.dwCurrentState != SERVICE_STOPPED) {
-            //spdlog::info("Service '{}' is running. Attempting to stop it before removal...", ConvertWStringToString(serviceName));
             LOG_INFO("Service '{}' is running. Attempting to stop it before removal...", ConvertWStringToString(serviceName));
 
             try {
@@ -168,7 +167,6 @@ void WindowsServiceManager::removeService(const std::wstring& serviceName) {
             }
             catch (const std::exception& ex) {
                 // If stopping fails, output the error but continue to poll for stopped status.
-                //spdlog::warn("Warning: Failed to stop service '{}': {}", ConvertWStringToString(serviceName), ex.what());
                 LOG_WARN("Warning: Failed to stop service '{}': {}", ConvertWStringToString(serviceName), ex.what());
             }
 
@@ -184,7 +182,6 @@ void WindowsServiceManager::removeService(const std::wstring& serviceName) {
                 ++attempts;
             }
             if (attempts == maxWaitAttempts) {
-                //spdlog::error("Timeout waiting for service '{}' to stop before removal.", ConvertWStringToString(serviceName));
                 LOG_ERROR("Timeout waiting for service '{}' to stop before removal.", ConvertWStringToString(serviceName));
                 return;
             }
@@ -194,22 +191,18 @@ void WindowsServiceManager::removeService(const std::wstring& serviceName) {
         ServiceHandle serviceHandle = openServiceHandle(serviceName, DELETE);
         if (!DeleteService(serviceHandle.get())) {
             DWORD error = GetLastError();
-            //spdlog::error("Failed to remove service '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             LOG_ERROR("Failed to remove service '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             return;
         }
 
         // Finally, unregister the service from our internal container.
         unregisterService(serviceName);
-        //spdlog::info("Service '{}' has been successfully removed.", ConvertWStringToString(serviceName));
         LOG_INFO("Service '{}' has been successfully removed.", ConvertWStringToString(serviceName));
     }
     catch (const std::exception& e) {
-        //spdlog::error("Exception occurred while removing service '{}': {}", ConvertWStringToString(serviceName), e.what());
         LOG_ERROR("Exception occurred while removing service '{}': {}", ConvertWStringToString(serviceName), e.what());
     }
     catch (...) {
-        //spdlog::error("Unknown error occurred while removing service '{}'.", ConvertWStringToString(serviceName));
         LOG_ERROR("Unknown error occurred while removing service '{}'.", ConvertWStringToString(serviceName));
     }
 }
@@ -233,7 +226,6 @@ bool WindowsServiceManager::startService(const std::wstring& serviceName, const 
 
         if (!serviceHandle.get()) {
             DWORD error = GetLastError();
-            //spdlog::error("Failed to open service handle for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             LOG_ERROR("Failed to open service handle for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
 
             return false;
@@ -246,26 +238,22 @@ bool WindowsServiceManager::startService(const std::wstring& serviceName, const 
 
         if (!::StartService(serviceHandle.get(), static_cast<DWORD>(argPtrs.size()), argPtrs.empty() ? nullptr : argPtrs.data())) {
             DWORD error = GetLastError();
-            //spdlog::error("Failed to start service '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             LOG_ERROR("Failed to start service '{}'. Error: {}", ConvertWStringToString(serviceName), error);
 
             return false;
         }
 
-        //spdlog::info("Service '{}' started successfully.", ConvertWStringToString(serviceName));
         LOG_INFO("Service '{}' started successfully.", ConvertWStringToString(serviceName));
 
         return true;
 
     }
     catch (const std::exception& e) {
-        //spdlog::error("Exception occurred while starting service '{}': {}", ConvertWStringToString(serviceName), e.what());
         LOG_ERROR("Exception occurred while starting service '{}': {}", ConvertWStringToString(serviceName), e.what());
 
         return false;
     }
     catch (...) {
-        //spdlog::error("Unknown error occurred while starting service '{}'.", ConvertWStringToString(serviceName));
         LOG_ERROR("Unknown error occurred while starting service '{}'.", ConvertWStringToString(serviceName));
 
         return false;
@@ -290,7 +278,6 @@ bool WindowsServiceManager::stopService(const std::wstring& serviceName) {
 
         if (!serviceHandle.get()) {
             DWORD error = GetLastError();
-            //spdlog::error("Failed to open service handle for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             LOG_ERROR("Failed to open service handle for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
 
             return false;
@@ -299,40 +286,32 @@ bool WindowsServiceManager::stopService(const std::wstring& serviceName) {
         SERVICE_STATUS_PROCESS ssp;
         DWORD bytesNeeded;
 
-        // Proveravamo trenutni status servisa
         if (!QueryServiceStatusEx(serviceHandle.get(), SC_STATUS_PROCESS_INFO,
             reinterpret_cast<LPBYTE>(&ssp), sizeof(SERVICE_STATUS_PROCESS), &bytesNeeded)) {
             DWORD error = GetLastError();
-            //spdlog::error("Failed to query service status for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             LOG_ERROR("Failed to query service status for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
 
             return false;
         }
 
-        // Ako je servis ve? zaustavljen, nema potrebe za daljim akcijama
         if (ssp.dwCurrentState == SERVICE_STOPPED) {
-            //spdlog::info("Service '{}' is already stopped.", ConvertWStringToString(serviceName));
             LOG_INFO("Service '{}' is already stopped.", ConvertWStringToString(serviceName));
 
             return true;
         }
 
-        // Pokušavamo da zaustavimo servis
-        //spdlog::info("Stopping service '{}'...", ConvertWStringToString(serviceName));
         LOG_INFO("Stopping service '{}'...", ConvertWStringToString(serviceName));
 
         SERVICE_STATUS status;
         if (!ControlService(serviceHandle.get(), SERVICE_CONTROL_STOP, &status)) {
             DWORD error = GetLastError();
-            //spdlog::error("Failed to send stop command to service '{}'. Error: {}", ConvertWStringToString(serviceName), error);
             LOG_ERROR("Failed to send stop command to service '{}'. Error: {}", ConvertWStringToString(serviceName), error);
 
             return false;
         }
 
-        // ?ekamo da se servis zaista ugasi
-        const int maxRetries = 10; // Maksimalan broj provera
-        const int waitTimeMs = 500; // Vreme ?ekanja izme?u provera u milisekundama
+        const int maxRetries = 10; 
+        const int waitTimeMs = 500; 
         int retries = 0;
 
         while (ssp.dwCurrentState != SERVICE_STOPPED && retries < maxRetries) {
@@ -340,7 +319,6 @@ bool WindowsServiceManager::stopService(const std::wstring& serviceName) {
             if (!QueryServiceStatusEx(serviceHandle.get(), SC_STATUS_PROCESS_INFO,
                 reinterpret_cast<LPBYTE>(&ssp), sizeof(SERVICE_STATUS_PROCESS), &bytesNeeded)) {
                 DWORD error = GetLastError();
-                //spdlog::error("Failed to query service status during stop process for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
                 LOG_ERROR("Failed to query service status during stop process for '{}'. Error: {}", ConvertWStringToString(serviceName), error);
 
                 return false;
@@ -349,26 +327,22 @@ bool WindowsServiceManager::stopService(const std::wstring& serviceName) {
         }
 
         if (ssp.dwCurrentState == SERVICE_STOPPED) {
-            //spdlog::info("Service '{}' stopped successfully.", ConvertWStringToString(serviceName));
             LOG_INFO("Service '{}' stopped successfully.", ConvertWStringToString(serviceName));
 
             return true;
         }
         else {
-            //spdlog::error("Service '{}' did not stop within the expected time.", ConvertWStringToString(serviceName));
             LOG_ERROR("Service '{}' did not stop within the expected time.", ConvertWStringToString(serviceName));
 
             return false;
         }
     }
     catch (const std::exception& e) {
-        //spdlog::error("Exception occurred while stopping service '{}': {}", ConvertWStringToString(serviceName), e.what());
         LOG_ERROR("Exception occurred while stopping service '{}': {}", ConvertWStringToString(serviceName), e.what());
 
         return false;
     }
     catch (...) {
-        //spdlog::error("Unknown error occurred while stopping service '{}'.", ConvertWStringToString(serviceName));
         LOG_ERROR("Unknown error occurred while stopping service '{}'.", ConvertWStringToString(serviceName));
 
         return false;
@@ -551,7 +525,6 @@ bool WindowsServiceManager::isServiceInstalled(const std::wstring& serviceName) 
     try {
         ServiceHandle serviceHandle = openServiceHandle(serviceName, SERVICE_QUERY_STATUS);
         if (!serviceHandle.valid()) {
-            //spdlog::warn("Service '{}' is NOT installed (handle is invalid).", ConvertWStringToString(serviceName));
             LOG_WARN("Service '{}' is NOT installed (handle is invalid).", ConvertWStringToString(serviceName));
 
             return false;
@@ -559,7 +532,6 @@ bool WindowsServiceManager::isServiceInstalled(const std::wstring& serviceName) 
         return true;
     }
     catch (const std::exception& e) {
-        //spdlog::error("Exception while checking if service '{}' is installed: {}", ConvertWStringToString(serviceName), e.what());
         LOG_ERROR("Exception while checking if service '{}' is installed: {}", ConvertWStringToString(serviceName), e.what());
 
         return false;

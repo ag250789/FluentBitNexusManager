@@ -23,14 +23,18 @@ public:
     }
 
     /**
-     * @brief Pokre?e proces inicijalne instalacije: preuzima ZIP, raspakuje ga i potvr?uje instalaciju.
-     * @return True ako je instalacija uspešna, false ako nije potrebna ili ako do?e do greške.
+     * @brief Initiates the initial installation process by downloading and extracting a ZIP file.
+     *
+     * This function attempts to download the installation package from a valid URL,
+     * using optional proxy settings if available. If the installation is required,
+     * the downloaded package is extracted. Otherwise, the downloaded file is deleted.
+     *
+     * @return true if the installation was successful, false if it was not needed or if an error occurred.
      */
     bool PerformInitialInstallation() {
         try {
             std::string url = urlGenerator.getValidUrl();
             if (url.empty()) {
-                //spdlog::error("No valid URL found for initial installation.");
                 LOG_ERROR("No valid URL found for initial installation.");
 
                 return false;
@@ -40,7 +44,6 @@ public:
             std::string proxyConfig = pathManager.GetProxyFilePath();
             FileDownloader downloader(url, downloadPath);
             if (!downloader.downloadWithOptionalProxy(url,downloadPath,proxyConfig)) {
-                //spdlog::error("Failed to download the installation file: {}", downloadPath);
                 LOG_ERROR("Failed to download the installation file: {}", downloadPath);
 
                 return false;
@@ -48,11 +51,9 @@ public:
 
             bool shouldExtract = configMonitor.InitialInstall();
             if (shouldExtract) {
-                //spdlog::info("Initial installation required, extracting...");
                 LOG_INFO("Initial installation required, extracting...");
 
                 if (!ExtractUpdate()) {
-                    //spdlog::error("Failed to extract installation package from {}", downloadPath);
                     LOG_ERROR("Failed to extract installation package from {}", downloadPath);
 
                     return false;
@@ -60,14 +61,12 @@ public:
                 return true;
             }
 
-            //spdlog::info("Deleting unnecessary ZIP file.");
             LOG_INFO("Deleting unnecessary ZIP file.");
 
             fs::remove(downloadPath);
             return false;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception in PerformInitialInstallation: {}", e.what());
             LOG_ERROR("Exception in PerformInitialInstallation: {}", e.what());
 
             return false;
@@ -85,7 +84,6 @@ public:
             std::string url = urlGenerator.getValidUrl();
             std::cout << url << std::endl;
             if (url.empty()) {
-                //spdlog::error("No valid URL found for update");
                 LOG_ERROR("No valid URL found for update");
 
                 return false;
@@ -99,7 +97,6 @@ public:
             UpgradePathManager pathManager;
             std::string proxyConfig = pathManager.GetProxyFilePath();
             if (!downloader.downloadWithOptionalProxy(url, downloadPath, proxyConfig)) {
-                //spdlog::error("Failed to download the installation file: {}", downloadPath);
                 LOG_ERROR("Failed to download the installation file: {}", downloadPath);
 
                 return false;
@@ -113,26 +110,21 @@ public:
                 std::string exe2 = ConvertWStringToString(path.GetService2TargetPath());
                 std::string jsonCheck = path.GetServiceHashFilePath();
 
-                // Ako je BILO KOJI od fajlova promenjen, postavi shouldExtract na true
                 bool exe1Changed = !IsFileUnchanged(exe1, jsonCheck);
                 bool exe2Changed = !IsFileUnchanged(exe2, jsonCheck);
 
                 if (exe1Changed || exe2Changed) {
-                    //spdlog::info("One or more files have changed. Extraction is required.");
                     LOG_INFO("One or more files have changed. Extraction is required.");
                     shouldExtract = true;
                 }
                 else {
-                    //spdlog::info("All files are unchanged. No extraction needed.");
                     LOG_INFO("All files are unchanged. No extraction needed.");
                 }
             }
             if (shouldExtract) {
-                //spdlog::info("New update detected, extracting...");
                 LOG_INFO("New update detected, extracting...");
 
                 if (!ExtractUpdate()) {
-                    //spdlog::error("Failed to extract update from {}", downloadPath);
                     LOG_ERROR("Failed to extract update from {}", downloadPath);
 
                     return false;
@@ -140,58 +132,66 @@ public:
                 return true;
             }
 
-            //spdlog::info("Update file is unchanged. Deleting unnecessary ZIP file.");
             LOG_INFO("Update file is unchanged. Deleting unnecessary ZIP file.");
 
             fs::remove(downloadPath);
             return false;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception in PerformUpdate: {}", e.what());
             LOG_ERROR("Exception in PerformUpdate: {}", e.what());
 
             return false;
         }
     }
 
+    /**
+     * @brief Determines if a full reinstall is required.
+     *
+     * This function checks whether the update process requires a complete reinstallation
+     * by analyzing the update type.
+     *
+     * @return true if a full reinstall is required, false otherwise.
+     */
     bool NeedsFullReinstall() {
         return DetermineUpdateType() == UpdateType::FULL_REINSTALL;
     }
 
+    /**
+     * @brief Cleans the extracted folder by removing all unnecessary files.
+     *
+     * This function deletes all extracted files and directories except `service_hashes.json`.
+     * It ensures that the folder is cleaned up after an update process to avoid conflicts.
+     *
+     * If the folder does not exist, it logs a warning and skips cleanup.
+     */
+
     void CleanExtractedFolder() {
         if (!fs::exists(extractPath)) {
-            //spdlog::warn("Extract folder '{}' does not exist. Skipping cleanup.", extractPath);
             LOG_WARN("Extract folder '{}' does not exist. Skipping cleanup.", extractPath);
 
             return;
         }
 
         try {
-            //spdlog::info("Cleaning extracted folder: {}", extractPath);
             LOG_INFO("Cleaning extracted folder: {}", extractPath);
 
 
             for (const auto& entry : fs::directory_iterator(extractPath)) {
-                // Proveravamo da li je fajl "service_hashes.json" i preska?emo ga
                 if (entry.path().filename() == "service_hashes.json") {
-                    //spdlog::info("Skipping file: {}", entry.path().string());
                     LOG_INFO("Skipping file: {}", entry.path().string());
 
                     continue;
                 }
 
                 fs::remove_all(entry);
-                //spdlog::info("Deleted: {}", entry.path().string());
                 LOG_INFO("Deleted: {}", entry.path().string());
 
             }
 
-            //spdlog::info("Extracted folder '{}' cleaned successfully.", extractPath);
             LOG_INFO("Extracted folder '{}' cleaned successfully.", extractPath);
 
         }
         catch (const std::exception& e) {
-            //spdlog::error("Failed to clean extracted folder '{}': {}", extractPath, e.what());
             LOG_ERROR("Failed to clean extracted folder '{}': {}", extractPath, e.what());
 
         }
@@ -210,65 +210,61 @@ private:
     std::string extractPath;
     ZipManager zipManager;
 
+    /**
+     * @brief Checks if a file has remained unchanged based on its SHA-256 hash.
+     *
+     * This function computes the SHA-256 hash of the specified file and compares it
+     * with the previously stored hash in a JSON file. If the file is missing or the
+     * hash does not match, it is considered changed.
+     *
+     * @param filePath The path to the file being checked.
+     * @param jsonFilePath The path to the JSON file storing file hashes.
+     * @return true if the file is unchanged, false otherwise.
+     */
     bool IsFileUnchanged(const std::string& filePath, const std::string& jsonFilePath) {
         try {
             FileHasher hasher(jsonFilePath);
 
-            // Provera da li fajl postoji
             if (!fs::exists(filePath)) {
-                //spdlog::error("File does not exist: {}", filePath);
                 LOG_ERROR("File does not exist: {}", filePath);
                 return false;
             }
 
-            // Izra?unavanje trenutnog hash-a fajla
             auto currentHash = hasher.GetFileSHA256(filePath);
             if (!currentHash) {
-                //spdlog::error("Failed to compute hash for file: {}", filePath);
                 LOG_ERROR("Failed to compute hash for file: {}", filePath);
                 return false;
             }
 
-            // Provera da li JSON fajl postoji
             if (!fs::exists(jsonFilePath)) {
-                //spdlog::warn("JSON file '{}' does not exist.", jsonFilePath);
                 LOG_WARN("JSON file '{}' does not exist.", jsonFilePath);
                 return false;
             }
 
-            // Dohvatanje sa?uvanog hash-a iz JSON-a
             auto storedHash = hasher.GetStoredFileHash(filePath);
             if (!storedHash) {
-                //spdlog::warn("Stored hash not found or invalid for file: {}", filePath);
                 LOG_WARN("Stored hash not found or invalid for file: {}", filePath);
                 return false;
             }
 
-            //spdlog::info("Computed hash: {}", *currentHash);
             LOG_INFO("Computed hash: {}", *currentHash);
 
-            //spdlog::info("Stored hash: {}", *storedHash);
             LOG_INFO("Stored hash: {}", *storedHash);
 
-            // Pore?enje trenutnog i sa?uvanog hash-a
             if (*currentHash == *storedHash) {
-                //spdlog::info("File '{}' is unchanged.", filePath);
                 LOG_INFO("File '{}' is unchanged.", filePath);
                 return true;
             }
 
-            //spdlog::info("File '{}' has changed.", filePath);
             LOG_INFO("File '{}' has changed.", filePath);
             return false;
 
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception in IsFileUnchanged for '{}': {}", filePath, e.what());
             LOG_ERROR("Exception in IsFileUnchanged for '{}': {}", filePath, e.what());
             return false;
         }
         catch (...) {
-            //spdlog::error("Unknown error in IsFileUnchanged for '{}'.", filePath);
             LOG_ERROR("Unknown error in IsFileUnchanged for '{}'.", filePath);
             return false;
         }
@@ -280,32 +276,26 @@ private:
      */
     bool ExtractUpdate() {
         if (!fs::exists(downloadPath)) {
-            //spdlog::error("ZIP file not found: {}", downloadPath);
             LOG_ERROR("ZIP file not found: {}", downloadPath);
 
             return false;
         }
 
         if (!zipManager.ExtractArchiveToFolder(downloadPath, extractPath)) {
-            //spdlog::error("Failed to extract ZIP file: {}", downloadPath);
             LOG_ERROR("Failed to extract ZIP file: {}", downloadPath);
 
             return false;
         }
 
-        //spdlog::info("Successfully extracted update to {}", extractPath);
         LOG_INFO("Successfully extracted update to {}", extractPath);
 
 
-        // Brisemo ZIP fajl nakon raspakivanja
         try {
             fs::remove(downloadPath);
-            //spdlog::info("Deleted ZIP file after successful extraction: {}", downloadPath);
             LOG_INFO("Deleted ZIP file after successful extraction: {}", downloadPath);
 
         }
         catch (const std::exception& e) {
-            //spdlog::warn("Failed to delete ZIP file '{}': {}", downloadPath, e.what());
             LOG_WARN("Failed to delete ZIP file '{}': {}", downloadPath, e.what());
 
         }
@@ -322,21 +312,18 @@ private:
     UpdateType DetermineUpdateType() {
         std::string updateConfigPath = extractPath + "\\ncrv_dcs_streaming_service_upgrade_manager\\upgrade_config.json";
 
-        //spdlog::info("Checking update configuration at: {}", updateConfigPath); 
         LOG_INFO("Checking update configuration at: {}", updateConfigPath);
 
 
         if (!fs::exists(updateConfigPath)) {
-            //spdlog::warn("No 'update_config.json' found, assuming service restart only.");
             LOG_WARN("No 'update_config.json' found, assuming service restart only.");
 
-            return UpdateType::RESTART_ONLY; // Ako fajl ne postoji, podrazumeva se restart
+            return UpdateType::RESTART_ONLY; 
         }
 
         try {
             std::ifstream file(updateConfigPath);
             if (!file.is_open()) {
-                //spdlog::error("Failed to open 'update_config.json' for reading.");
                 LOG_ERROR("Failed to open 'update_config.json' for reading.");
 
                 return UpdateType::RESTART_ONLY;
@@ -348,25 +335,21 @@ private:
 
             if (config.contains("full_reinstall") && config["full_reinstall"].is_boolean()) {
                 bool fullReinstall = config["full_reinstall"];
-                //spdlog::info("full_reinstall: {}", fullReinstall);
                 LOG_INFO("full_reinstall: {}", fullReinstall);
             }
 
             if (config.contains("reason") && config["reason"].is_string()) {
                 std::string reason = config["reason"];
-                //spdlog::info("reason: {}", reason);
                 LOG_INFO("reason: {}", reason);
             }
 
             if (config.contains("required_version") && config["required_version"].is_string()) {
                 std::string requiredVersion = config["required_version"];
-                //spdlog::info("required_version: {}", requiredVersion);
                 LOG_INFO("required_version: {}", requiredVersion);
             }
 
             if (config.contains("timestamp") && config["timestamp"].is_string()) {
                 std::string timestamp = config["timestamp"];
-                //spdlog::info("timestamp: {}", timestamp);
                 LOG_INFO("timestamp: {}", timestamp);
             }
 
@@ -375,13 +358,11 @@ private:
                 return fullReinstall ? UpdateType::FULL_REINSTALL : UpdateType::RESTART_ONLY;
             }
 
-            //spdlog::warn("Invalid 'update_config.json' format. Assuming restart only.");
             LOG_WARN("Invalid 'update_config.json' format. Assuming restart only.");
 
             return UpdateType::RESTART_ONLY;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Error reading 'update_config.json': {}", e.what());
             LOG_ERROR("Error reading 'update_config.json': {}", e.what());
 
             return UpdateType::RESTART_ONLY;

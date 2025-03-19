@@ -22,18 +22,26 @@ public:
     }
 
     /**
-     * @brief Callback funkcija za upis podataka u fajl tokom preuzimanja.
+     * @brief Callback function for writing data to a file during download.
+     *
+     * This function is used by `libcurl` to write received data into a file. It checks for valid
+     * pointers before proceeding with writing data. If an error occurs, it logs the issue and
+     * returns 0 to indicate failure.
+     *
+     * @param contents Pointer to the downloaded data.
+     * @param size Size of a single data unit.
+     * @param nmemb Number of data units.
+     * @param userp Pointer to the file stream where data should be written.
+     * @return The number of bytes written to the file, or 0 on failure.
      */
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
         if (!contents || !userp) {
-            //spdlog::error("WriteCallback: Invalid pointer passed.");
             LOG_ERROR("WriteCallback: Invalid pointer passed.");
             return 0;
         }
 
         std::ofstream* file = static_cast<std::ofstream*>(userp);
         if (!file->is_open()) {
-            //spdlog::error("WriteCallback: File is not open for writing.");
             LOG_ERROR("WriteCallback: File is not open for writing.");
             return 0;
         }
@@ -42,7 +50,13 @@ public:
     }
 
     /**
-     * @brief Proverava da li postoji dovoljno prostora na disku pre preuzimanja.
+     * @brief Checks if there is enough free disk space before downloading a file.
+     *
+     * This function determines whether the available disk space is sufficient for the file
+     * to be downloaded. It logs an error if the disk space check fails.
+     *
+     * @param fileSize The size of the file to be downloaded.
+     * @return true if there is enough free space, false otherwise.
      */
     bool hasSufficientDiskSpace(uint64_t fileSize) {
         try {
@@ -50,14 +64,20 @@ public:
             return spaceInfo.available >= fileSize;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Failed to check disk space: {}", e.what());
             LOG_ERROR("Failed to check disk space: {}", e.what());
             return false;
         }
     }
 
     /**
-     * @brief Sigurno preuzima fajl koriste?i `libcurl`, sa retry mehanizmom.
+     * @brief Securely downloads a file using `libcurl` with a retry mechanism.
+     *
+     * This function downloads a file from a specified URL using `libcurl`. It ensures the
+     * destination directory exists, handles errors gracefully, and retries downloading if a
+     * recoverable server error occurs (5xx HTTP responses). The function also verifies the
+     * response code and logs necessary information throughout the process.
+     *
+     * @return true if the download is successful, false otherwise.
      */
     bool download() {
         std::lock_guard<std::mutex> lock(downloadMutex);
@@ -65,11 +85,9 @@ public:
         try {
             fs::path dir = fs::path(destinationPath).parent_path();
             if (!fs::exists(dir)) {
-                //spdlog::info("Creating directory: {}", dir.string());
                 LOG_INFO("Creating directory: {}", dir.string());
 
                 if (!fs::create_directories(dir)) {
-                    //spdlog::error("Failed to create directory: {}", dir.string());
                     LOG_ERROR("Failed to create directory: {}", dir.string());
 
                     return false;
@@ -79,7 +97,6 @@ public:
             int attempt = 0;
             while (attempt < maxRetries) {
                 if (attempt > 0) {
-                    //spdlog::warn("Retrying download... Attempt: {}", attempt + 1);
                     LOG_WARN("Retrying download... Attempt: {}", attempt + 1);
 
                     std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -87,7 +104,6 @@ public:
 
                 std::ofstream outputFile(destinationPath, std::ios::binary | std::ios::trunc);
                 if (!outputFile.is_open()) {
-                    //spdlog::error("Failed to open file: {}", destinationPath);
                     LOG_ERROR("Failed to open file: {}", destinationPath);
 
                     return false;
@@ -103,7 +119,6 @@ public:
 
                 std::unique_ptr<CURL, CurlDeleter> curl(curl_easy_init());
                 if (!curl) {
-                    //spdlog::error("Failed to initialize CURL");
                     LOG_ERROR("Failed to initialize CURL");
 
                     return false;
@@ -124,7 +139,6 @@ public:
                 outputFile.close();
 
                 if (res == CURLE_OK && response_code == 200) {
-                    //spdlog::info("Download successful: {}", destinationPath);
                     LOG_INFO("Download successful: {}", destinationPath);
 
                     return true;
@@ -139,13 +153,11 @@ public:
                 }
             }
 
-            //spdlog::error("Download failed after {} attempts", maxRetries);
             LOG_ERROR("Download failed after {} attempts", maxRetries);
 
             return false;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception during download: {}", e.what());
             LOG_ERROR("Exception during download: {}", e.what());
 
             return false;
@@ -153,22 +165,29 @@ public:
     }
 
     /**
-     * @brief Preuzima fajl koriste?i proxy ako je konfigurisan.
+     * @brief Downloads a file with optional proxy support.
+     *
+     * This function attempts to download a file from a given URL to a specified destination path.
+     * If a proxy configuration file is provided and exists, it loads the proxy settings and determines
+     * whether to use the proxy for downloading. If the proxy is enabled, the function delegates the
+     * download to the proxy handler. Otherwise, it falls back to direct downloading.
+     *
+     * @param url The URL of the file to be downloaded.
+     * @param destinationPath The local path where the downloaded file will be saved.
+     * @param proxyConfigPath (Optional) Path to the proxy configuration file.
+     * @return true if the download is successful, false otherwise.
      */
     bool downloadWithOptionalProxy(const std::string& url, const std::string& destinationPath, const std::string& proxyConfigPath = "") {
         try {
-            //spdlog::info("Starting download for URL: {}", url);
             LOG_INFO("Starting download.");
 
 
             if (!proxyConfigPath.empty() && fs::exists(proxyConfigPath)) {
-                //spdlog::info("Proxy configuration found. Using proxy for download.");
                 LOG_INFO("Proxy configuration found. Using proxy for download.");
 
                 Proxy proxy(proxyConfigPath);
 
                 if (!proxy.isProxyEnabled()) {
-                    //spdlog::warn("Proxy is disabled in the configuration. Falling back to direct download.");
                     LOG_WARN("Proxy is disabled in the configuration. Falling back to direct download.");
 
                 }
@@ -177,23 +196,19 @@ public:
                 }
             }
             else {
-                //spdlog::info("No proxy configuration found. Using direct download.");
                 LOG_INFO("No proxy configuration found. Using direct download.");
 
             }
 
-            // Koristi obi?an FileDownloader ako proxy nije dostupan
             FileDownloader downloader(url, destinationPath);
             return downloader.download();
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception occurred in downloadWithOptionalProxy: {}", e.what());
             LOG_ERROR("Exception occurred in downloadWithOptionalProxy: {}", e.what());
 
             return false;
         }
         catch (...) {
-            //spdlog::error("Unknown exception occurred in downloadWithOptionalProxy.");
             LOG_ERROR("Unknown exception occurred in downloadWithOptionalProxy.");
 
             return false;
@@ -201,41 +216,77 @@ public:
     }
 
 private:
-    std::string url;             ///< URL fajla koji se preuzima.
-    std::string destinationPath; ///< Putanja gde ?e se fajl sa?uvati.
-    int maxRetries;              ///< Maksimalan broj pokušaja.
-    int timeoutSeconds;          ///< Timeout za preuzimanje.
-    std::mutex downloadMutex;    ///< Mutex za sinhronizaciju.
+    /**
+     * @brief URL of the file to be downloaded.
+     *
+     * This string stores the web address from which the file will be downloaded.
+     */
+    std::string url;
 
     /**
-     * @brief Obrada razli?itih HTTP status kodova i CURL grešaka.
+     * @brief Destination path where the downloaded file will be saved.
+     *
+     * This string specifies the local file path where the downloaded file will be stored.
+     */
+    std::string destinationPath;
+
+    /**
+     * @brief Maximum number of retry attempts for the download.
+     *
+     * If the download fails due to a recoverable error (e.g., server-side errors),
+     * the function will retry up to this specified number of times.
+     */
+    int maxRetries;
+
+    /**
+     * @brief Timeout duration (in seconds) for the download operation.
+     *
+     * This value defines the maximum time allowed for the download to complete
+     * before it is considered a failure.
+     */
+    int timeoutSeconds;
+
+    /**
+     * @brief Mutex for synchronizing the download process.
+     *
+     * Ensures that multiple threads do not interfere with the download operation,
+     * preventing race conditions and ensuring thread safety.
+     */
+    std::mutex downloadMutex;
+
+
+    /**
+     * @brief Handles `libcurl` errors and HTTP response codes.
+     *
+     * This function logs errors related to `libcurl` operations and processes HTTP response codes.
+     * It provides specific error messages for common HTTP errors such as 404 (Not Found) and
+     * 403 (Forbidden). Additionally, it issues a warning for server-side errors (5xx) to indicate
+     * a possible retry scenario.
+     *
+     * @param res CURLcode representing the result of the `libcurl` operation.
+     * @param response_code HTTP response code received from the server.
      */
     void HandleCurlError(CURLcode res, long response_code) {
         if (res != CURLE_OK) {
-            //spdlog::error("CURL error: {} - {}", static_cast<int>(res), std::string(curl_easy_strerror(res)));
             LOG_ERROR("CURL error: {} - {}", static_cast<int>(res), std::string(curl_easy_strerror(res)));
 
         }
 
         switch (response_code) {
         case 404:
-            //spdlog::error("File not found (404): {}", url);
             LOG_ERROR("File not found (404).");
 
             break;
         case 403:
-            //spdlog::error("Access forbidden (403): {}", url);
             LOG_ERROR("Access forbidden (403).");
 
             break;
         default:
             if (response_code >= 500 && response_code <= 599) {
-                //spdlog::warn("Server error ({}), retrying...", response_code);
                 LOG_WARN("Server error ({}), retrying...", response_code);
 
             }
             else {
-                //spdlog::error("Unexpected HTTP response ({}): {}", response_code, url);
                 LOG_ERROR("Unexpected HTTP response ({}).", response_code);
 
             }

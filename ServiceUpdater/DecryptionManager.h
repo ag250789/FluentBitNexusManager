@@ -63,14 +63,12 @@ public:
     std::string decrypt_field(const std::string& encrypted_hex) {
         auto encrypted_data = hex_to_bytes(encrypted_hex);
         if (encrypted_data.empty()) {
-            //spdlog::error("Empty encrypted data passed for decryption");
             LOG_ERROR("Empty encrypted data passed for decryption");
             return "";
         }
 
         std::vector<unsigned char> decrypted_data;
         if (!decrypt_data(encrypted_data, decrypted_data)) {
-            //spdlog::error("Failed to decrypt field.");
             LOG_ERROR("Failed to decrypt field.");
             return "";
         }
@@ -110,7 +108,6 @@ private:
     bool decrypt_data(const std::vector<unsigned char>& encrypted_data, std::vector<unsigned char>& decrypted_data) const {
 
         if (encrypted_data.size() < NONCE_LEN + MAC_LEN) {
-            //spdlog::error("Encrypted data is too small for decryption.");
             LOG_ERROR("Encrypted data is too small for decryption.");
             return false;
         }
@@ -122,7 +119,6 @@ private:
         decrypted_data.resize(decrypted_size);
 
         if (crypto_secretbox_open_easy(decrypted_data.data(), encrypted_data.data() + NONCE_LEN, encrypted_data.size() - NONCE_LEN, nonce, key) != 0) {
-            //spdlog::error("Decryption process failed.");
             LOG_ERROR("Decryption process failed.");
             return false;
         }

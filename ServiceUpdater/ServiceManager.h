@@ -13,67 +13,69 @@ namespace fs = std::filesystem;
 
 /**
  * @class ServiceManager
- * @brief Klasa za deinstalaciju i instalaciju Windows servisa.
+ * @brief Manages the installation and uninstallation of Windows services.
+ *
+ * This class provides functionality to uninstall an existing service, install a new one,
+ * and manage related service configuration files. It ensures that the service is correctly
+ * installed and that outdated executable files are deleted after installation.
  */
 class ServiceManager {
 public:
     /**
-     * @brief Konstruktor klase ServiceManager.
-     * @param serviceName Ime servisa.
-     * @param exePath Putanja do novog `exe` fajla servisa.
-     * @param args Lista argumenata za instalaciju.
+     * @brief Constructs a ServiceManager instance.
+     *
+     * Initializes the service manager with the given service name, executable path,
+     * and optional installation arguments.
+     *
+     * @param serviceName The name of the service to be managed.
+     * @param exePath The path to the service's executable file.
+     * @param args A list of arguments for service installation.
      */
     ServiceManager(const std::wstring& serviceName, const std::wstring& exePath, const std::vector<std::wstring>& args = {})
         : m_serviceName(serviceName), m_exePath(exePath), m_args(args) {
     }
 
     /**
-     * @brief Pokre?e proces deinstalacije i instalacije servisa.
-     * @return true ako je uspešno, false ako ne uspe.
+     * @brief Uninstalls an existing service (if installed) and installs a new version.
+     *
+     * This function first checks whether the service is already installed. If it is,
+     * the service is uninstalled before proceeding with the installation of the new
+     * executable. It also verifies that the executable file exists before installation.
+     *
+     * @return true if the update is successful, false otherwise.
      */
     bool UpdateService() {
         try {
             WindowsServiceManager manager;
 
-            // **Proveravamo da li servis postoji i deinstaliramo ga ako je potrebno**
             if (manager.isServiceInstalled(m_serviceName)) {
-                //spdlog::info("Service '{}' is already installed. Uninstalling first...", ConvertWStringToString(m_serviceName));
                 LOG_INFO("Service '{}' is already installed. Uninstalling first...", ConvertWStringToString(m_serviceName));
 
                 if (!UninstallService()) {
-                    //spdlog::error("Service '{}' could not be uninstalled. Aborting update!", ConvertWStringToString(m_serviceName));
                     LOG_ERROR("Service '{}' could not be uninstalled. Aborting update!", ConvertWStringToString(m_serviceName));
 
                     return false;
                 }
 
-                // **Dodatna provera da li je servis stvarno uklonjen**
                 if (manager.isServiceInstalled(m_serviceName)) {
-                    //spdlog::error("Service '{}' is still detected as installed. Aborting installation.", ConvertWStringToString(m_serviceName));
                     LOG_ERROR("Service '{}' is still detected as installed. Aborting installation.", ConvertWStringToString(m_serviceName));
 
                     return false;
                 }
             }
 
-            // **Proveravamo da li novi `exe` fajl postoji**
             if (!fs::exists(m_exePath)) {
-                //spdlog::error("New service executable not found: {}", ConvertWStringToString(m_exePath));
                 LOG_ERROR("New service executable not found: {}", ConvertWStringToString(m_exePath));
 
                 return false;
             }
 
-            // ? **Pokre?emo instalaciju**
             if (!InstallService()) {
-                //spdlog::error("Failed to install service '{}'.", ConvertWStringToString(m_serviceName));
                 LOG_ERROR("Failed to install service '{}'.", ConvertWStringToString(m_serviceName));
 
                 return false;
             }
-
             
-            // ? **Brišemo `exe` fajl nakon uspešne instalacije**
             DeleteExeFile();
 
             UpgradePathManager pathManager;
@@ -88,12 +90,10 @@ public:
                 auto exe1Hash = hasher.GetFileSHA256(exe1);
                 if (exe1Hash) {
                     hasher.StoreFileHash(ConvertWStringToString(exe1), *exe1Hash);
-                    //spdlog::info("Stored hash for service '{}': {}", ConvertWStringToString(exe1), *exe1Hash);
                     LOG_INFO("Stored hash for service '{}': {}", ConvertWStringToString(exe1), *exe1Hash);
 
                 }
                 else {
-                    //spdlog::error("Failed to compute and store hash for '{}'", ConvertWStringToString(exe1));
                     LOG_ERROR("Failed to compute and store hash for '{}'", ConvertWStringToString(exe1));
 
                 }
@@ -103,12 +103,10 @@ public:
                 auto exe2Hash = hasher.GetFileSHA256(exe2);
                 if (exe2Hash) {
                     hasher.StoreFileHash(ConvertWStringToString(exe2), *exe2Hash);
-                    //spdlog::info("Stored hash for service '{}': {}", ConvertWStringToString(exe2), *exe2Hash);
                     LOG_INFO("Stored hash for service '{}': {}", ConvertWStringToString(exe2), *exe2Hash);
 
                 }
                 else {
-                    //spdlog::error("Failed to compute and store hash for '{}'", ConvertWStringToString(exe2));
                     LOG_ERROR("Failed to compute and store hash for '{}'", ConvertWStringToString(exe2));
 
                 }
@@ -117,18 +115,26 @@ public:
             return true;
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception in ServiceManager: {}", e.what());
             LOG_ERROR("Exception in ServiceManager: {}", e.what());
 
             return false;
         }
     }
 
+    /**
+     * @brief Copies a service configuration file to a new location.
+     *
+     * This function ensures that the configuration file exists before attempting
+     * to copy it to the destination.
+     *
+     * @param sourceConfigPath The path to the source configuration file.
+     * @param destinationConfigPath The destination path where the configuration file should be copied.
+     * @return true if the file is copied successfully, false otherwise.
+     */
+
     static bool CopyServiceConfig(const std::string& sourceConfigPath, const std::string& destinationConfigPath) {
         try {
-            // Provera da li konfiguracioni fajl postoji
             if (!fs::exists(sourceConfigPath)) {
-                //spdlog::error("Source config file '{}' does not exist. Cannot copy.", sourceConfigPath);
                 LOG_ERROR("Source config file '{}' does not exist. Cannot copy.",sourceConfigPath);
                 return false;
             }
@@ -136,12 +142,10 @@ public:
             UpgradePathManager::copy_file_robust(sourceConfigPath, destinationConfigPath);
         }
         catch (const std::exception& e) {
-            //spdlog::error("Exception while copying config for Controller Service: {}", e.what());
             LOG_ERROR("Exception while copying config for Controller Service: {}", e.what());
             return false;
         }
         catch (...) {
-            //spdlog::error("Unknown error occurred while copying config.");
             LOG_ERROR("Unknown error occurred while copying config for service.");
             return false;
         }
@@ -149,13 +153,16 @@ public:
 
 
 private:
-    std::wstring m_serviceName;
-    std::wstring m_exePath;
-    std::vector<std::wstring> m_args;
+    std::wstring m_serviceName;  ///< The name of the service being managed.
+    std::wstring m_exePath;      ///< The path to the service executable.
+    std::vector<std::wstring> m_args;  ///< The list of installation arguments.
 
     /**
-     * @brief Deinstalira servis pokretanjem `uninstall` komande.
-     * @return true ako je uspešno, false ako ne uspe.
+     * @brief Uninstalls the service using the `uninstall` command.
+     *
+     * This function runs the service's executable with the `uninstall` command to remove the service.
+     *
+     * @return true if the service was successfully uninstalled, false otherwise.
      */
     bool UninstallService() {
         std::wstring uninstallCommand = L"\"" + m_exePath + L"\" uninstall";
@@ -168,21 +175,22 @@ private:
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
-            //spdlog::info("Service '{}' uninstalled successfully.", ConvertWStringToString(m_serviceName));
             LOG_INFO("Service '{}' uninstalled successfully.", ConvertWStringToString(m_serviceName));
 
             return true;
         }
 
-        //spdlog::error("Failed to uninstall service '{}'. Error: {}", ConvertWStringToString(m_serviceName), GetLastError());
         LOG_ERROR("Failed to uninstall service '{}'. Error: {}", ConvertWStringToString(m_serviceName), GetLastError());
 
         return false;
     }
 
     /**
-     * @brief Instalira servis pokretanjem `install` komande sa argumentima.
-     * @return true ako je uspešno, false ako ne uspe.
+     * @brief Installs the service using the `install` command.
+     *
+     * This function executes the service's installation command along with any provided arguments.
+     *
+     * @return true if the service was successfully installed, false otherwise.
      */
     bool InstallService() {
         std::wstring installCommand = L"\"" + m_exePath + L"\" install";
@@ -196,37 +204,35 @@ private:
         PROCESS_INFORMATION pi = {};
 
         if (CreateProcessW(nullptr, &installCommand[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
-            //spdlog::info("Service '{}' installation started...", ConvertWStringToString(m_serviceName));
             LOG_INFO("Service '{}' installation started...", ConvertWStringToString(m_serviceName));
 
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
-            //spdlog::info("Service '{}' installed successfully.", ConvertWStringToString(m_serviceName));
             LOG_INFO("Service '{}' installed successfully.", ConvertWStringToString(m_serviceName));
 
             return true;
         }
 
-        //spdlog::error("Failed to start installation process for '{}'. Error: {}", ConvertWStringToString(m_serviceName), GetLastError());
         LOG_ERROR("Failed to start installation process for '{}'. Error: {}", ConvertWStringToString(m_serviceName), GetLastError());
 
         return false;
     }
 
     /**
-     * @brief Briše `exe` fajl nakon uspešne instalacije.
+     * @brief Deletes the service's executable file after installation.
+     *
+     * This function ensures that the executable file is removed once the installation
+     * process is complete, preventing unnecessary file retention.
      */
     void DeleteExeFile() {
         if (fs::exists(m_exePath)) {
             try {
                 fs::remove(m_exePath);
-                //spdlog::info("Deleted temporary service executable: {}", ConvertWStringToString(m_exePath));
                 LOG_INFO("Deleted temporary service executable: {}", ConvertWStringToString(m_exePath));
 
             }
             catch (const std::exception& e) {
-                //spdlog::warn("Failed to delete service executable '{}': {}", ConvertWStringToString(m_exePath), e.what());
                 LOG_WARN("Failed to delete service executable '{}': {}", ConvertWStringToString(m_exePath), e.what());
 
             }
