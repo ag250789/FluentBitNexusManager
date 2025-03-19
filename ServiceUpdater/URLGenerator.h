@@ -4,7 +4,6 @@
 #include "DecryptionManager.h"
 #include <string>
 #include <unordered_map>
-#include <cpr/cpr.h>
 #include <iostream>
 
 class URLGenerator {
