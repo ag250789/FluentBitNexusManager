@@ -40,7 +40,7 @@ public:
 
         try {
             if (!makeCurlRequestWithProxy(url, destinationPath)) {
-                LOG_ERROR("Failed to download file from URL: {}", url);
+                LOG_ERROR("Failed to download file.");
 
                 return false;
             }
@@ -85,7 +85,7 @@ public:
      * @return true if the request was successful, false otherwise.
      */
     bool makeCurlRequestWithProxy(const std::string& url, const std::string& output_file) {
-        LOG_INFO("Preparing to make a request to: {}", url);
+        LOG_INFO("Preparing to make a request.");
 
 
         if (!proxy_enabled) {
@@ -192,7 +192,7 @@ private:
                 throw std::runtime_error("Failed to open output file");
             }
 
-            LOG_INFO("Downloading file from: {}", url);
+            LOG_INFO("Downloading file....");
 
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
@@ -224,9 +224,9 @@ private:
             if (ssl_enabled) {
                 bool verify_peer = config["proxy"]["ssl"]["verify_peer"].get<bool>();
                 bool verify_host = config["proxy"]["ssl"]["verify_host"].get<bool>();
-                std::string ca_cert = config["proxy"]["ssl"]["ca_cert_path"].get<std::string>();
-                std::string client_cert = config["proxy"]["ssl"]["client_cert_path"].get<std::string>();
-                std::string client_key = config["proxy"]["ssl"]["client_key_path"].get<std::string>();
+                std::string ca_cert = config["proxy"]["ssl"].contains("ca_cert_path") ? config["proxy"]["ssl"]["ca_cert_path"].get<std::string>() : "";
+                std::string client_cert = config["proxy"]["ssl"].contains("client_cert_path") ? config["proxy"]["ssl"]["client_cert_path"].get<std::string>() : "";
+                std::string client_key = config["proxy"]["ssl"].contains("client_key_path") ? config["proxy"]["ssl"]["client_key_path"].get<std::string>() : "";
 
                 LOG_INFO("SSL/TLS Settings:");
                 LOG_INFO(" - Verify Peer: {}", verify_peer);
