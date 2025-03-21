@@ -494,19 +494,34 @@ private:
 
     bool HandleConfigurationFiles() {
         UpgradePathManager pathManager;
-
-        if (!CommandLineParser::copy_file_robust(logConfig, pathManager.GetLoggerFilePath())) {
-            spdlog::error("Failed to copy log configuration file.");
-            return false;
+    
+        bool success = true;
+    
+        if (std::filesystem::exists(logConfig)) {
+            if (!CommandLineParser::copy_file_robust(logConfig, pathManager.GetLoggerFilePath())) {
+                spdlog::error("Failed to copy log configuration file.");
+                success = false;
+            }
         }
-
-        if (!CommandLineParser::copy_file_robust(proxyConfig, pathManager.GetProxyFilePath())) {
-            spdlog::error("Failed to copy proxy configuration file.");
-            return false;
+        else {
+            spdlog::warn("Log configuration file does not exist, skipping.");
         }
-
-        spdlog::info("Configuration files copied successfully.");
-        return true;
+    
+        if (std::filesystem::exists(proxyConfig)) {
+            if (!CommandLineParser::copy_file_robust(proxyConfig, pathManager.GetProxyFilePath())) {
+                spdlog::error("Failed to copy proxy configuration file.");
+                success = false;
+            }
+        }
+        else {
+            spdlog::warn("Proxy configuration file does not exist, skipping.");
+        }
+    
+        if (success) {
+            spdlog::info("Configuration files copied successfully.");
+        }
+    
+        return success;
     }
 };
 #endif // MAIN_SERVICE_H
